@@ -1,13 +1,60 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
-* [flexbe_core] Fix handling of boolean behavior args
-* [flexbe_core] Merge pull request #153 from omercans/fix/set-current-state-of-cc-to-none-on-forced-exit
-* [flexbe_core] Merge pull request #154 from duwke/patch-1 - Check topic availability before returning last_msg
-* [flexbe_core] Merge pull request #163 from LoyVanBeek/fix/nested_sm_userdata - Fix nested state machine userdata
+
+2.3.1 (2023-07-31)
+------------------
+* merge from ros2-devel to reduce spam and missing package handling
+
+2.3.0 (2023-07-20)
+------------------
+* add wait_duration to proxy action client send goal and other tweaks
+  * This change could reducing waiting. If you need longer wait time, specify wait_duration
+* make action client is_available check current status not wait
+* flake8 cleanup; make test consistent; protect against build farm timing issue
+* cleanup; modify handling of existing subscriptions
+* Updates to dependencies for ROS build farm
+* Modify sync messaging to avoid issue if not active state when behavior shuts down
+* clean up some spam to FlexBE app console
+* include package name in behavior request (requires flexbe_app 3.1+) to allow duplicate behavior names in packages
+
+2.2.0 (2023-06-29)
+------------------
+* Modify to used behavior_id (checksum) and behavior_key consistently
+* Modify shutdown handling for clean stop
+* Modify wait() handling to avoid creating a rate object
+* modify sync handling and execute loop timing
+* add proxy tf listener
+* Require 'inst_id' for ProxySubscriber setup (change from 'id')
+* flake8, pep257, pylint cleanup; licenses and copyright
+* Pull request #154
+* Pull request #163
+* Pull request #153 Modification
+* Merge pull request #11 from grejj/ros2-devel
+  Added destroy rate calls to clear up rate resources (undone by item 2 above)
+
+2.1.1 (2022-09-12)
+------------------
+* ProxyServiceCaller changes
+  * fix issue #1
+  * wait_duration handling
+  * connect without service being available
+  * misc cleanup
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* Includes changes sync check handling
+* Label proxy subscribers by instance id and handle instance type changes
+* Update proxy action client handling
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------

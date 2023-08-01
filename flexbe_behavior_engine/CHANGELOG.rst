@@ -1,14 +1,42 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
-* [flexbe_core] Merge pull request #153 from omercans/fix/set-current-state-of-cc-to-none-on-forced-exit
-* [flexbe_core] Merge pull request #154 from duwke/patch-1 - Check topic availability before returning last_msg
-* [flexbe_states] Merge pull request #160 from cpswarm/fix_namespace - namespace fix for topic lookup with rostopic in subscriber state
-* [flexbe_core] Merge pull request #163 from LoyVanBeek/fix/nested_sm_userdata - Fix nested state machine userdata
-* [flexbe_onboard] Merge pull request #165 from HannesBachter/feature/get_userdata - get userdata by service
+
+2.3.1 (2023-07-31)
+------------------
+* Update flexbe_ci.yml for actions/checkout@v3 
+
+2.3.0 (2023-07-20)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+
+2.2.0 (2023-06-29)
+------------------
+* [flexbe_core, flexbe_onboard, flexbe_mirror, flexbe_widget]
+  - Use behavior_key and behavior_id for consistency
+  - rework mirror and be_launcher to prevent deadlocks
+  - add heartbeat messages to mirror and launcher
+  - pep257 and flake8 cleanup
+* [flexbe_msgs] Add comments and modify BehaviorSelection message to use 
+  behavior_key and behavior_id for consistency with other messages
+* update README links; tweak LICENSE and package info
+* Modify shutdown handling for clean stop
+* Modify wait() handling to avoid creating a rate object
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* Includes changes sync check handling
+* Add formatted traceback to local log for behavior errors
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------

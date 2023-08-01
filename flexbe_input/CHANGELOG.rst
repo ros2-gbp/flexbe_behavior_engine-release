@@ -1,9 +1,35 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
+* use standard queue for complex_action_server
+* remove python-six dependency
+
+2.3.1 (2023-07-31)
+------------------
+* modify input to allow lists or tuples (or just csv numbers); add pickle warning; post user prompt as hint to FlexBE log.
+
+2.3.0 (2023-07-20)
+------------------
+* add input_action_server with UI and update handling inside input_state
+  * WARNING: This change to input_state.py may require changes to how data is being sent
+* Updates to dependencies for ROS build farm
+
+2.2.0 (2023-06-29)
+------------------
+* pep257, flake8, and pylint cleanup
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* Update script_dir in setup.cfg
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------

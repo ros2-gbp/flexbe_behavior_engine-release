@@ -1,9 +1,42 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
+
+2.3.1 (2023-07-31)
+------------------
+* add non-interactive mode to create_repo for CI
+* update create_repo script for new ros2-devel release of https://github.com/FlexBE/flexbe_project_behaviors
+* merge from ros2-devel to reduce spam and missing package handling
+
+2.3.0 (2023-07-20)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+* remove rclpy from CMakeLists.txt
+* remove unnecessary rclcpp depends
+* include package name in behavior request (requires flexbe_app 3.1+) to allow duplicate behavior names in packages
+
+2.2.0 (2023-06-29)
+------------------
+* Initiate start up launch in thread safe manner with future (prevent deadlock)
+* Add periodic heartbeat message for number of seconds as Int32
+* Modify to used behavior_id (checksum) and behavior_key consistently
+* package updates; pylint, flake8, and pep257 cleanup
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* Modify launcher scripts
+* BehaviorLauncher is-a Node
+* Update script_dir in setup.cfg
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------

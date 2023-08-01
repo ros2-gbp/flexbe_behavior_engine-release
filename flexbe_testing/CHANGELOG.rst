@@ -1,9 +1,34 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
+
+2.3.1 (2023-07-31)
+------------------
+
+2.3.0 (2023-07-20)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+* remove rclpy from CMakeLists.txt
+* remove unnecessary rclcpp depends
+
+2.2.0 (2023-06-29)
+------------------
+* update to support pytest unittest cases via colcon test; pylint, flake8, and pep257 cleanup
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* Update script_dir in setup.cfg
+* Use instance id for proxy subscribers
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------

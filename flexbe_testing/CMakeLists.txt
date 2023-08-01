@@ -1,35 +1,41 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.10.2)
 project(flexbe_testing)
 
-find_package(catkin REQUIRED)
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-catkin_python_setup()
+install(PROGRAMS
+    bin/testing_node
+    DESTINATION lib/${PROJECT_NAME}
+)
 
-# specify catkin-specific information
-# INCLUDE_DIRS - The exported include paths (i.e. cflags) for the package
-# LIBRARIES - The exported libraries from the project
-# CATKIN_DEPENDS - Other catkin projects that this project depends on
-# DEPENDS - Non-catkin CMake projects that this project depends on
-# CFG_EXTRAS - Additional configuration options 
-catkin_package(
-    INCLUDE_DIRS src
-    LIBRARIES ${PROJECT_NAME})
+install(DIRECTORY
+    launch
+    DESTINATION share/${PROJECT_NAME}
+)
 
-# use add_library() or add_executable() as required
-#add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SRCS})
+install(DIRECTORY
+    tests
+    DESTINATION share/${PROJECT_NAME}
+)
 
-FILE(GLOB BIN_FILES "bin/*")
-
-# install executables
-install(PROGRAMS ${BIN_FILES} DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
-install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(DIRECTORY test DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-
-# run tests
-if(CATKIN_ENABLE_TESTING)
-	find_package(rostest REQUIRED)
-	add_rostest(test/selftest.test)
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  set(_pytest_tests
+    tests/flexbe_colcon_test.py
+    # Add other test files here
+  )
+  foreach(_test_path ${_pytest_tests})
+    get_filename_component(_test_name ${_test_path} NAME_WE)
+    ament_add_pytest_test(${_test_name} ${_test_path}
+      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}
+      TIMEOUT 60
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+  endforeach()
 endif()
+
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+
+ament_package()

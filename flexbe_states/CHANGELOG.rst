@@ -1,9 +1,43 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
+
+2.3.1 (2023-07-31)
+------------------
+* modify input to allow lists or tuples (or just csv numbers)
+* add pickle warning
+* post user prompt as hint to FlexBE log.
+* tweak the timeout description
+* use wait duration in input_state
+* modify is_available for current status check not wait
+* update action client test
+
+2.3.0 (2023-07-20)
+------------------
+* add input_action_server with UI and update handling inside input_state
+  * WARNING: This change to input_state.py may require changes to how data is being sent
+* add timeout and use wait duration to action client calls
+* Updates to dependencies for ROS build farm
+
+2.2.0 (2023-06-29)
+------------------
+* update to use flexbe_testing with colcon test; pylint, flake8, pep257 cleanup
+* Merge pull request #8 from AravindaDP/ros2-devel
+  fix: subscriber_state.py
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* Use instance id for proxy subscribers
+* Update script_dir in setup.cfg
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------

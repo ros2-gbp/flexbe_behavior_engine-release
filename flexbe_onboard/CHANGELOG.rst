@@ -1,10 +1,47 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1.4.0 (2023-05-18)
+2.3.2 (2023-08-01)
 ------------------
-* Updates for Melodic and Noetic releases on github.com/FlexBE
-* [flexbe_onboard] Merge pull request #165 from HannesBachter/feature/get_userdata - get userdata by service
+
+2.3.1 (2023-07-31)
+------------------
+* merge from ros2-devel to reduce spam and missing package handling
+
+2.3.0 (2023-07-20)
+------------------
+* flake8 cleanup; make test consistent
+* protect against build farm timing issue
+* updates to dependencies for ROS build farm
+* clean up some spam to FlexBE App console and just send to local terminal and log
+* include package name in behavior request (requires flexbe_app 3.1+) to allow duplicate behavior names in packages
+
+2.2.0 (2023-06-29)
+------------------
+* Modify to used behavior_id (checksum) and behavior_key consistently
+* Modify shutdown handling for clean stop
+* Modify wait() handling to avoid creating a rate object
+* rework timing and sync (significant change to handling, enables proper use_sim_time)
+* use inst_id for proxy subscribers (change to API)
+* add colcon test pytests; copyright and license info; pep257, flake8, and pylint cleanup
+* Merge team-vigir PR165 user data service
+* Merge pull request #11 from grejj/ros2-devel
+  Added destroy rate calls to clear up rate resources (This was replaced by items 2 and 3 above)
+
+2.1.0 (2022-08-02)
+------------------
+* ROS 2 Humble release
+* FlexbeOnboard is-a Node
+* Includes changes sync check handling
+* Add formatted traceback to local log for behavior errors
+* Updated status messages
+* Update script_dir in setup.cfg
+* Tested under Ubuntu 22.04 and ROS Humble
+
+2.0.0 (2022-02-22)
+------------------
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
 
 1.3.1 (2020-12-11)
 ------------------
