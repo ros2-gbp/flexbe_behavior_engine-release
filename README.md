@@ -1,3 +1,35 @@
+## flexbe_behavior_engine (humble) - 2.3.2-1
+
+The packages in the `flexbe_behavior_engine` repository were released into the `humble` distro by running `/usr/bin/bloom-release --new-track --rosdistro humble --track humble flexbe_behavior_engine -d` on `Tue, 01 Aug 2023 16:01:34 -0000`
+
+These packages were released:
+- `flexbe_behavior_engine`
+- `flexbe_core`
+- `flexbe_input`
+- `flexbe_mirror`
+- `flexbe_msgs`
+- `flexbe_onboard`
+- `flexbe_states`
+- `flexbe_testing`
+- `flexbe_widget`
+
+Version of package(s) in repository `flexbe_behavior_engine`:
+
+- upstream repository: https://github.com/FlexBE/flexbe_behavior_engine.git
+- release repository: unknown
+- rosdistro version: `null`
+- old version: `null`
+- new version: `2.3.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.11.2`
+- catkin_pkg version: `0.5.2`
+- rosdep version: `0.22.2`
+- rosdistro version: `0.9.0`
+- vcstools version: `0.1.42`
+
+
 ## flexbe (noetic) - 1.4.0-2
 
 The packages in the `flexbe` repository were released into the `noetic` distro by running `/usr/bin/bloom-release --rosdistro noetic --track noetic flexbe --edit` on `Mon, 22 May 2023 16:06:51 -0000`
