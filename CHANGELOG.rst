@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.3 (2023-08-09)
+------------------
+* cleanup
+
 2.3.2 (2023-08-01)
 ------------------
 
@@ -18,7 +22,7 @@ Changelog for package flexbe_states
 ------------------
 * add input_action_server with UI and update handling inside input_state
   * WARNING: This change to input_state.py may require changes to how data is being sent
-* add timeout and use wait duration to action client calls
+* use wait duration with proxy action client and add timeout
 * Updates to dependencies for ROS build farm
 
 2.2.0 (2023-06-29)
