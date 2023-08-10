@@ -24,7 +24,7 @@ tracks:
     ros_distro: humble
     vcs_type: git
     vcs_uri: https://github.com/FlexBE/flexbe_behavior_engine.git
-    version: 2.3.2
+    version: 2.3.3
   indigo:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
