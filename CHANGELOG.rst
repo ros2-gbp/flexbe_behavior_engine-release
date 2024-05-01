@@ -1,6 +1,13 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.0 (2024-05-01)
+------------------
+* update with state map and changes to concurrent handling
+* allow removing action clients and service callers
+* add options to remove service callers and action clients
+* flake8, pep257 and codestyle checks
+
 2.3.3 (2023-08-09)
 ------------------
 * cleanup
@@ -23,6 +30,19 @@ Changelog for package flexbe_states
 * add input_action_server with UI and update handling inside input_state
   * WARNING: This change to input_state.py may require changes to how data is being sent
 * use wait duration with proxy action client and add timeout
+* Updates to dependencies for ROS build farm
+
+2.3.4 (2024-05-01)
+------------------
+* 2.3.3
+* destroy sub/pub/client in executor thread; use SingleThreadedExecutor without callback groups; use basic pub/sub for onboard; cleanup
+* update for change in yaml loading for Iron messages; subscriber state test still not functional
+* 2.3.2
+* 2.3.1
+* modify input to allow lists or tuples (or just csv numbers); add pickle warning; post user prompt as hint to FlexBE log.
+* 2.3.0
+* use wait duration in input_state; modify is_available for current status check not wait; update action client test
+* add input_action_server with UI and update handling inside input_state (*Significant*)
 * Updates to dependencies for ROS build farm
 
 2.2.0 (2023-06-29)
