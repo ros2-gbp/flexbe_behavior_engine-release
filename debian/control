@@ -1,0 +1,12 @@
+Source: ros-rolling-flexbe-behavior-engine
+Section: misc
+Priority: optional
+Maintainer: Philipp Schillinger <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), ros-rolling-ament-cmake, ros-rolling-flexbe-core, ros-rolling-flexbe-input, ros-rolling-flexbe-mirror, ros-rolling-flexbe-msgs, ros-rolling-flexbe-onboard, ros-rolling-flexbe-states, ros-rolling-flexbe-testing, ros-rolling-flexbe-widget, ros-rolling-ros-workspace
+Homepage: http://ros.org/wiki/flexbe
+Standards-Version: 3.9.2
+
+Package: ros-rolling-flexbe-behavior-engine
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-flexbe-core, ros-rolling-flexbe-input, ros-rolling-flexbe-mirror, ros-rolling-flexbe-msgs, ros-rolling-flexbe-onboard, ros-rolling-flexbe-states, ros-rolling-flexbe-testing, ros-rolling-flexbe-widget, ros-rolling-ros-workspace
+Description: A meta-package to aggregate all the FlexBE packages
