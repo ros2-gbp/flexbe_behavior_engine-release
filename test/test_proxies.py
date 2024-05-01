@@ -38,6 +38,7 @@ import rclpy
 from rclpy.action import ActionServer
 from rclpy.executors import MultiThreadedExecutor
 
+from action_msgs.msg import GoalStatus
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from flexbe_msgs.action import BehaviorExecution
@@ -269,26 +270,62 @@ class TestProxies(unittest.TestCase):
         ProxyActionClient.initialize(self.node)
         client = ProxyActionClient({topic1: BehaviorExecution}, wait_duration=1.0)
         self.assertFalse(client.has_result(topic1))
+        status = client.get_state(topic1)
+        self.node.get_logger().info(f"validate action client - check state before sending = {status} ")
+
         client.send_goal(topic1, BehaviorExecution.Goal(), wait_duration=1.0)
+        status = client.get_state(topic1)
+        self.node.get_logger().info(f"validate action client - check state after goal sent = {status} ")
 
         end_time = time.time() + 10
-        while time.time() < end_time:
+        while time.time() < end_time and not client.has_result(topic1):
+            status = client.get_state(topic1)
+            # self.node.get_logger().info(f"   get state = {status} ")
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
             self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
 
         self.assertTrue(client.has_result(topic1))
 
+        status = client.get_state(topic1)
+        self.node.get_logger().info(f"   check state = {status} ")
+
+        self.node.get_logger().info("validate action client result 1 ... ")
         result = client.get_result(topic1)
         self.assertEqual(result.outcome, 'ok')
 
+        status = client.get_state(topic1)
+        self.assertEqual(status, GoalStatus.STATUS_SUCCEEDED)
+        self.node.get_logger().info("validate action client succeeded - OK! ")
+
+        status = client.get_state(topic1)
+        self.node.get_logger().info(f"   check state before send 2 = {status} ")
         client.send_goal(topic1, BehaviorExecution.Goal(), wait_duration=1.0)
+        status = client.get_state(topic1)
+        self.node.get_logger().info(f"   check state after sending goal 2 = {status} ")
 
         # end_time = time.time() + 2
         while not client.has_result(topic1):
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
             self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
+            status = client.get_state(topic1)
+            # self.node.get_logger().info(f"   check state = {status} ")
 
         self.assertFalse(client.is_active(topic1))
+
+        self.node.get_logger().info("validate action client result 2 ... ")
+        result = client.get_result(topic1)
+        self.assertEqual(result.outcome, 'ok')
+
+        status = client.get_state(topic1)
+        self.assertEqual(status, GoalStatus.STATUS_SUCCEEDED)
+        self.node.get_logger().info("validate action client succeeded 2 - OK! ")
+
+        self.assertTrue(client.has_result(topic1))
+        client.remove_result(topic1)
+        self.assertIsNone(client._result.get(topic1))
+        self.assertIsNone(client._result_status.get(topic1))
+        self.assertFalse(client.has_result(topic1))
+        self.node.get_logger().info("validated remove_result! ")
 
         self.assertFalse(client.is_available('/not_there'))
         client = ProxyActionClient({'/invalid': BehaviorExecution}, wait_duration=.1)
