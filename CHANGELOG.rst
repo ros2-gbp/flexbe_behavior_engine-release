@@ -1,6 +1,17 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.0 (2024-05-01)
+------------------
+* update with state map and changes to concurrent handling
+* allow removing action clients and service callers
+* flake 8 cleanup
+* fix CONSTANT style across flexbe_behavior_engine
+* use SingleThreadedExecutor
+
+2.3.4 (2024-05-01)
+------------------
+
 2.3.3 (2023-08-09)
 ------------------
 
