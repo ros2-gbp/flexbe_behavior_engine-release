@@ -1,9 +1,35 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.0 (2024-05-01)
+------------------
+* update with state map and changes to concurrent handling
+* add options to remove service callers and action clients
+* proxy publisher dictionary usage
+* use modern style names with deprecated flag
+* add sync lock to proxies
+* added code to remove subscriptions and publishers with sync lock
+* use deque for msg buffer add lock to prevent modifications during callback (e.g. when thread starts or finishes)
+* add hash for StateMap outcome index to standardize handling
+* reinitialize existing state machine instead of rebuilding on sync (1000x faster)
+* update with standardized topic handling
+* update ui version handling
+* OperatableStateMachine is now a pseudo manually transitionable state (TODO -separate logic to shadow state design)
+* add is_controlled check to avoid attempts at duplicate subscriptions and cleanup
+* onboard side coded to send new BehaviorSync and 'mirror/outcome'
+* adding state_id handling; pre-building ContainerStructure to set IDs
+* flake8, pep257 and codestyle checks
+
+2.3.4 (2024-05-01)
+------------------
+* proxy action client: remove result_status and test proxy status
+* Fixed bug when trying to get result state/GoalStatus.
+* Add throttle option for logging (PR #14)
+
 2.3.3 (2023-08-09)
 ------------------
 * destroy sub/pub/client in executor thread
+* update to protect against executor calls after unsubscribe/shutdown
 * use SingleThreadedExecutor without callback groups
 * use basic pub/sub for onboard; cleanup
 

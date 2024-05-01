@@ -1,6 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.0 (2024-05-01)
+------------------
+* update with state map and changes to concurrent handling
+* allow removing action clients and service callers
+* support for new state id and concurrency handling
+
 2.3.3 (2023-08-09)
 ------------------
 
@@ -13,6 +19,16 @@ Changelog for package flexbe_msgs
 2.3.0 (2023-07-20)
 ------------------
 * add defined request types for BehaviorInput
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+
+2.3.4 (2024-05-01)
+------------------
+* 2.3.3
+* 2.3.2
+* 2.3.1
+* 2.3.0
+* add input_action_server with UI and update handling inside input_state (*Significant*)
 * update CMakeLists cmake_minimum_version
 * Updates to dependencies for ROS build farm
 
