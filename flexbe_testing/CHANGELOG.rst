@@ -1,11 +1,6 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3.0.0 (2024-05-01)
-------------------
-* update with state map and changes to concurrent handling
-* allow removing action clients and service callers
-
 2.3.3 (2023-08-09)
 ------------------
 * update for change in yaml loading for Iron messages

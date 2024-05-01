@@ -28,9 +28,7 @@
 
 
 """Colcon testing for flexbe_testing."""
-
 from os.path import join
-import unittest
 
 from flexbe_testing.py_tester import PyTester
 
@@ -72,7 +70,3 @@ class TestFlexBETesting(PyTester):
     def test_behavior(self):
         """Invoke unittest defined .test file."""
         return self.run_test("behavior")
-
-
-if __name__ == '__main__':
-    unittest.main()
