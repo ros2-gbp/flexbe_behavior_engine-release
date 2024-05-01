@@ -1,6 +1,20 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.0 (2024-05-01)
+------------------
+* update with state map and changes to concurrent handling
+* allow removing action clients and service callers
+* flake 8 cleanup
+* support state id and concurrency handling
+* specify version 4.0+ of the FlexBE UI
+* add link for new flexbe_webui 
+
+2.3.4 (2024-05-01)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+
 2.3.3 (2023-08-09)
 ------------------
 
