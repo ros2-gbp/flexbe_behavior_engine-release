@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+# Copyright 2024 Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,30 +29,39 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""A state machine that is always executed alone when becoming active."""
-from flexbe_core.core.operatable_state_machine import OperatableStateMachine
+"""Test description for test proxies."""
+import os
+import sys
+import launch
+import launch_testing.actions
+import pytest
 
 
-class PriorityContainer(OperatableStateMachine):
-    """A state machine that is always executed alone when becoming active."""
+@pytest.mark.rostest
+def generate_test_description():
 
-    active_container = None
+    path_to_test = os.path.dirname(__file__)
 
-    def __init__(self, conditions=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._parent_active_container = None
-        self._type = OperatableStateMachine.ContainerType.PriorityContainer.value
+    TEST_PROC_PATH = os.path.join(path_to_test, 'test_logger.py')
 
-    def execute(self, *args, **kwargs):
-        if (PriorityContainer.active_container is None
-            or not all(p == PriorityContainer.active_container.split('/')[i]
-                       for i, p in enumerate(self.path.split('/')))):
-            self._parent_active_container = PriorityContainer.active_container
-            PriorityContainer.active_container = self.path
+    # This is necessary to get unbuffered output from the process under test
+    proc_env = os.environ.copy()
+    proc_env['PYTHONUNBUFFERED'] = '1'
 
-        outcome = OperatableStateMachine.execute(self, *args, **kwargs)
+    test_logger = launch.actions.ExecuteProcess(
+        cmd=[sys.executable, TEST_PROC_PATH],
+        env=proc_env,
+        output='screen',
+        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=90),
+        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=90)
+    )
 
-        if outcome is not None:
-            PriorityContainer.active_container = self._parent_active_container
-
-        return outcome
+    return (
+        launch.LaunchDescription([
+            test_logger,
+            launch_testing.actions.ReadyToTest()
+        ]),
+        {
+            'test_logger': test_logger,
+        }
+    )
