@@ -1,4 +1,6 @@
-# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#!/usr/bin/env python3
+
+# Copyright 2024 Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,52 +29,39 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Colcon testing for flexbe_testing."""
-
-from os.path import join
-import unittest
-
-from flexbe_testing.py_tester import PyTester
-
-
-class TestFlexBETesting(PyTester):
-    """Colcon testing for flexbe_testing."""
-
-    def __init__(self, *args, **kwargs):
-        """Construct the unit test instance."""
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def setUpClass(cls):
-
-        PyTester._package = "flexbe_testing"
-        PyTester._tests_folder = join("tests", "res")
-
-        super().setUpClass()  # Do this last after setting package and tests folder
-
-    # The tests
-    def test_import_only(self):
-        """Invoke unittest defined .test file."""
-        return self.run_test("import_only")
-
-    def test_add(self):
-        """Invoke unittest defined .test file."""
-        return self.run_test("test_add")
-
-    # def test_add_bagfile(self):
-    #     """ invoke unittest defined .test file """
-    #     return self.run_test("test_add_bagfile")
-
-    def test_sub_unavailable(self):
-        """Invoke unittest defined .test file."""
-        #  This test requires longer than normal wait for valid return value
-        #  given 1.5 second timeout in test_sub_state.py
-        return self.run_test("sub_unavailable", timeout_sec=2.5, max_cnt=None)
-
-    def test_behavior(self):
-        """Invoke unittest defined .test file."""
-        return self.run_test("behavior")
+"""Test description for test proxies."""
+import os
+import sys
+import launch
+import launch_testing.actions
+import pytest
 
 
-if __name__ == '__main__':
-    unittest.main()
+@pytest.mark.rostest
+def generate_test_description():
+
+    path_to_test = os.path.dirname(__file__)
+
+    TEST_PROC_PATH = os.path.join(path_to_test, 'test_logger.py')
+
+    # This is necessary to get unbuffered output from the process under test
+    proc_env = os.environ.copy()
+    proc_env['PYTHONUNBUFFERED'] = '1'
+
+    test_logger = launch.actions.ExecuteProcess(
+        cmd=[sys.executable, TEST_PROC_PATH],
+        env=proc_env,
+        output='screen',
+        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=90),
+        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=90)
+    )
+
+    return (
+        launch.LaunchDescription([
+            test_logger,
+            launch_testing.actions.ReadyToTest()
+        ]),
+        {
+            'test_logger': test_logger,
+        }
+    )
