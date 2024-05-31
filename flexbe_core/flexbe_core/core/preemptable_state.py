@@ -36,7 +36,6 @@ from std_msgs.msg import Empty
 from flexbe_msgs.msg import CommandFeedback
 
 from flexbe_core.core.lockable_state import LockableState
-from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 
 
@@ -47,6 +46,7 @@ class PreemptableState(LockableState):
     If preempted, the state will not be executed anymore and return the outcome preempted.
     """
 
+    _preempted_name = 'preempted'
     preempt = False
 
     def __init__(self, *args, **kwargs):
@@ -56,10 +56,13 @@ class PreemptableState(LockableState):
 
         PreemptableState.preempt = False
 
+        self._feedback_topic = 'flexbe/command_feedback'
+        self._preempt_topic = 'flexbe/command/preempt'
+
     def _preemptable_execute(self, *args, **kwargs):
-        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
-            self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
-            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="preempt"))
+        if self._is_controlled and self._sub.has_msg(self._preempt_topic):
+            self._sub.remove_last_msg(self._preempt_topic)
+            self._pub.publish(self._feedback_topic, CommandFeedback(command="preempt"))
             PreemptableState.preempt = True
             Logger.localinfo("--> Behavior will be preempted")
 
@@ -73,20 +76,17 @@ class PreemptableState(LockableState):
 
     def _notify_skipped(self):
         # make sure we dont miss a preempt even if not being executed
-        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
-            self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
-            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="preempt"))
+        if self._is_controlled and self._sub.has_msg(self._preempt_topic):
+            self._sub.remove_last_msg(self._preempt_topic)
+            self._pub.publish(self._feedback_topic, CommandFeedback(command="preempt"))
             PreemptableState.preempt = True
 
     def _enable_ros_control(self):
-        if not self._is_controlled:
-            super()._enable_ros_control()
-            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
-            self._sub.subscribe(Topics._CMD_PREEMPT_TOPIC, Empty, inst_id=id(self))
-            PreemptableState.preempt = False
+        super()._enable_ros_control()
+        self._pub.createPublisher(self._feedback_topic, CommandFeedback)
+        self._sub.subscribe(self._preempt_topic, Empty, inst_id=id(self))
+        PreemptableState.preempt = False
 
     def _disable_ros_control(self):
-        if self._is_controlled:
-            super()._disable_ros_control()
-            self._sub.unsubscribe_topic(Topics._CMD_PREEMPT_TOPIC, inst_id=id(self))
-            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
+        super()._disable_ros_control()
+        self._sub.unsubscribe_topic(self._preempt_topic, inst_id=id(self))

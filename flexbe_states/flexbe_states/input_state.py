@@ -61,29 +61,21 @@ class InputState(EventState):
 
     """
 
-    def __init__(self, request, message, timeout=1.0, action_topic='flexbe/behavior_input'):
+    def __init__(self, request, message, timeout=1.0):
         """Construct instance."""
         super(InputState, self).__init__(outcomes=['received', 'aborted', 'no_connection', 'data_error'],
                                          output_keys=['data'])
+        self._action_topic = 'flexbe/behavior_input'
         ProxyActionClient.initialize(InputState._node)
-        self._action_topic = action_topic
-        self._client = None
+        self._client = ProxyActionClient({self._action_topic: BehaviorInput}, wait_duration=0.0)
         self._request = request
         self._message = message
         self._timeout = timeout
-        self._connected = False
+        self._connected = True
         self._received = False
 
-    def on_start(self):
-        self._client = ProxyActionClient({self._action_topic: BehaviorInput}, wait_duration=0.0)
-        self._connected = True
-
-    def on_stop(self):
-        ProxyActionClient.remove_client(self._action_topic)
-        self._client = None
-        self._connected = False
-
     def execute(self, userdata):
+
         if not self._connected:
             return 'no_connection'
         if self._received:
@@ -130,6 +122,6 @@ class InputState(EventState):
         # Attempt to send the goal.
         try:
             self._client.send_goal(self._action_topic, action_goal, wait_duration=self._timeout)
-        except Exception as exc:
-            Logger.logwarn('Was unable to send data request:\n%s' % str(exc))
+        except Exception as e:
+            Logger.logwarn('Was unable to send data request:\n%s' % str(e))
             self._connected = False

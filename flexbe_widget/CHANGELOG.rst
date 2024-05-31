@@ -1,13 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3.0.0 (2024-05-01)
+
+2.3.5 (2024-05-31)
 ------------------
-* update with state map and changes to concurrent handling
-* allow removing action clients and service callers
-* flake 8 cleanup
-* fix CONSTANT style across flexbe_behavior_engine
-* use SingleThreadedExecutor
+* use onboard heartbeat to trigger launcher
+* add command line argument to allow quicker startup
+* clean up tabs in subscriber state
 
 2.3.4 (2024-05-01)
 ------------------

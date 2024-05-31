@@ -181,12 +181,6 @@ class Behavior:
 
         self._state_machine.confirm(self.name, self.beh_id)
 
-    # def define_structure(self):
-    #     """
-    #     Calculate all state ids and prepare the ContainerStructure message
-    #     """
-    #     self._state_machine.define_structure()
-
     def execute(self):
         """
         Execute the behavior.
@@ -226,18 +220,16 @@ class Behavior:
         states[1].replace_state(state)  # add to new state machine
         self.requested_state_path = state.path  # set start after switch
 
-    def get_current_states(self):
-        return self._state_machine.get_deep_states()
+    def get_current_state(self):
+        return self._state_machine.get_deep_state()
 
     def get_locked_state(self):
-        """Return the first state designated as locked."""
-        states = self._state_machine.get_deep_states()
-        for state in states:
-            while state is not None:
-                if state.is_locked():
-                    return state
+        state = self._state_machine.get_deep_state()
+        while state is not None:
+            if state.is_locked():
+                return state
 
-                state = state._parent
+            state = state._parent
         return None
 
     @classmethod

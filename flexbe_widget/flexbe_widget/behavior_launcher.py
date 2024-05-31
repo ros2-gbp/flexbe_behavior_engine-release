@@ -32,8 +32,8 @@
 """Node to launch FlexBE behaviors."""
 
 from datetime import datetime
+import argparse
 import difflib
-import getopt
 import os
 import sys
 import threading
@@ -46,15 +46,16 @@ from rosidl_runtime_py import get_interface_path
 
 from std_msgs.msg import Int32, String
 
-from flexbe_msgs.msg import BehaviorModification, BehaviorRequest, BehaviorSelection, BEStatus, ContainerStructure
+from flexbe_msgs.msg import BehaviorModification, BehaviorRequest, BehaviorSelection
+from flexbe_msgs.msg import BehaviorSync, BEStatus, ContainerStructure
 
-from flexbe_core import BehaviorLibrary, Logger, MIN_UI_VERSION
-from flexbe_core.core import StateMap
-from flexbe_core.core.topics import Topics
+from flexbe_core import BehaviorLibrary, Logger
 
 
 class BehaviorLauncher(Node):
     """Node to launch FlexBE behaviors."""
+
+    MIN_VERSION = '2.2.0'
 
     def __init__(self):
         # Initiate the Node class's constructor and give it a name
@@ -62,19 +63,23 @@ class BehaviorLauncher(Node):
 
         self._ready_event = threading.Event()
 
-        self._sub = self.create_subscription(BehaviorRequest, Topics._REQUEST_BEHAVIOR_TOPIC, self._request_callback, 100)
-        self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC, self._version_callback, 1)
-        self._status_sub = self.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_callback, 100)
+        self._sub = self.create_subscription(BehaviorRequest, "flexbe/request_behavior", self._request_callback, 100)
+        self._version_sub = self.create_subscription(String, "flexbe/ui_version", self._version_callback, 100)
+        self._status_sub = self.create_subscription(BEStatus, "flexbe/status", self._status_callback, 100)
+        self._onboard_heartbeat_sub = self.create_subscription(BehaviorSync, "flexbe/heartbeat",
+                                                               self._onboard_heartbeat_callback, 10)
 
-        self._pub = self.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
-        self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 100)
-        self._mirror_pub = self.create_publisher(ContainerStructure, Topics._MIRROR_STRUCTURE_TOPIC, 100)
-        self._heartbeat_pub = self.create_publisher(Int32, Topics._LAUNCHER_HEARTBEAT_TOPIC, 2)
+        self._pub = self.create_publisher(BehaviorSelection, "flexbe/start_behavior", 100)
+        self._status_pub = self.create_publisher(BEStatus, "flexbe/status", 100)
+        self._mirror_pub = self.create_publisher(ContainerStructure, "flexbe/mirror/structure", 100)
+        self._heartbeat_pub = self.create_publisher(Int32, 'flexbe/launcher/heartbeat', 2)
 
         self._behavior_lib = BehaviorLibrary(self)
 
         # Require periodic events in case behavior is not connected to allow orderly shutdown
         self._heartbeat_timer = self.create_timer(2.0, self.heartbeat_timer_callback)
+        self._last_onboard_heartbeat = None
+        self._last_heartbeat_msg = None
 
         self.get_logger().info("%d behaviors available, ready for start request." % self._behavior_lib.count_behaviors())
 
@@ -86,6 +91,19 @@ class BehaviorLauncher(Node):
         """
         self._heartbeat_pub.publish(Int32(data=self.get_clock().now().seconds_nanoseconds()[0]))
 
+        if self._last_onboard_heartbeat is None:
+            self.get_logger().warn(f"Behavior Launcher has NOT received update from onboard behavior engine!")
+        else:
+            elapsed = self.get_clock().now() - self._last_onboard_heartbeat
+            if elapsed.nanoseconds > 2e9:
+                self.get_logger().warn(f"Behavior Launcher is NOT receiving updates from onboard behavior engine!")
+                self._last_onboard_heartbeat = None
+
+    def _onboard_heartbeat_callback(self, msg):
+        """Record time of last onboard heartbeat."""
+        self._last_onboard_heartbeat = self.get_clock().now()
+        self._last_heartbeat_msg = msg
+
     def _status_callback(self, msg):
         if msg.code in [BEStatus.READY, BEStatus.FINISHED, BEStatus.FAILED, BEStatus.ERROR, BEStatus.RUNNING, BEStatus.STARTED]:
             self.get_logger().info(f"BE status code={msg.code} received - READY for new behavior!")
@@ -94,18 +112,6 @@ class BehaviorLauncher(Node):
             self.get_logger().info(f"BE status code={msg.code} received ")
 
     def _request_callback(self, msg):
-        """Process request in separate thread to avoid blocking callbacks."""
-        if not self._ready_event.is_set():
-            Logger.logerr("Behavior engine is not ready - cannot process start request!")
-        else:
-            # self._ready_event.clear()  # require a new ready signal after publishing
-            # thread = threading.Thread(target=self._process_request, args=[msg])
-            # thread.daemon = True
-            # thread.start()
-            # Not waiting in process request, so safe to not block callback
-            self._process_request(msg)
-
-    def _process_request(self, msg):
         self.get_logger().info(f"Got message from request behavior for {msg.behavior_name}")
         be_key, behavior = self._behavior_lib.find_behavior(msg.behavior_name)
         if be_key is None:
@@ -144,20 +150,19 @@ class BehaviorLauncher(Node):
             be_selection.arg_keys = msg.arg_keys
             be_selection.arg_values = msg.arg_values
 
-        container_map = StateMap()
+        # wait until Behavior Engine status is BEStatus.READY
+        self.get_logger().info("Wait for Behavior Engine ...")
+        self._ready_event.wait()
+        self.get_logger().info("   BE is ready!")
+
         be_structure = ContainerStructure()
         be_structure.containers = msg.structure
-        for container in be_structure.containers:
-            # self.get_logger().info(f"BELauncher: request_callback: adding container {container.path} ...")
-            container_map.add_state(container.path, container)
-        # self.get_logger().info(f"BELauncher: request_callback: {msg.structure}")
 
         try:
             be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
         except Exception:  # pylint: disable=W0703
             self.get_logger().error("Could not find behavior package '%s'" % (behavior["package"]))
             self.get_logger().info("Have you built and updated your setup after creating the behavior?")
-            self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
             return
 
         with open(be_filepath_new, "r") as f:
@@ -169,7 +174,6 @@ class BehaviorLauncher(Node):
             be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
             if msg.autonomy_level != 255:
                 be_structure.behavior_id = be_selection.behavior_id
-                # self.get_logger().info(f"BELauncher: request_callback publish structure : {be_structure}")
                 self._mirror_pub.publish(be_structure)
             self._ready_event.clear()  # require a new ready signal after publishing
             self._pub.publish(be_selection)
@@ -192,22 +196,21 @@ class BehaviorLauncher(Node):
             be_structure.behavior_id = be_selection.behavior_id
             self._mirror_pub.publish(be_structure)
 
-        self._ready_event.clear()  # Force a new ready message before processing
+        self._ready_event.clear()  # require a new ready signal after publishing
         self._pub.publish(be_selection)
         self.get_logger().info(f"New behavior key={be_selection.behavior_key} published "
                                f"with checksum id = {be_selection.behavior_id}- start!")
 
     def _version_callback(self, msg):
-        vui = BehaviorLauncher._parse_version(msg.data)
-        vex = BehaviorLauncher._parse_version(MIN_UI_VERSION)
+        vui = self._parse_version(msg.data)
+        vex = self._parse_version(BehaviorLauncher.MIN_VERSION)
         if vui < vex:
-            Logger.logwarn('FlexBE App needs to be updated!\n'
-                           f'Behavior launcher requires at least version {MIN_UI_VERSION}, '
-                           f' but you have {msg.data}\n'
-                           'Please update the flexbe_app software.')
+            self.get_logger().warn('FlexBE App needs to be updated!\n'
+                                   f'Require at least version {BehaviorLauncher.MIN_VERSION}, '
+                                   f' but you have {msg.data}\n'
+                                   'Please update the flexbe_app software.')
 
-    @staticmethod
-    def _parse_version(v):
+    def _parse_version(self, v):
         result = 0
         offset = 1
         for n in reversed(v.split('.')):
@@ -216,59 +219,86 @@ class BehaviorLauncher(Node):
         return result
 
 
-def usage():
-    print("Usage: Soon...")
+def behavior_launcher_main():
+    """Run behavior launcher."""
+    # Create the argument parser
+    parser = argparse.ArgumentParser(description='Behavior launcher for FlexBE')
 
-
-def behavior_launcher_main(node_args=None):
-    opts = None
-    args = None
+    # Add the non-ROS node arguments to the parser
+    parser.add_argument('-b', '--behavior', type=str, help='Specify the behavior to launch')
+    parser.add_argument('-a', '--autonomy', type=int, default=255, help='Specify the autonomy level')
+    parser.add_argument('-s', '--autostart', action='store_true', help='Automatically start the behavior on heartbeat')
 
     try:
-        print(sys.argv)
         stop_index = len(sys.argv)
         try:
             # Stop processing after --ros-args
             stop_index = next(i for i in range(len(sys.argv)) if sys.argv[i] == "--ros-args")
-        except Exception:  # pylint: disable=W0703
+        except StopIteration:
             pass
-        opts, args = getopt.getopt(sys.argv[1:stop_index], "hb:a:", ["help", "behavior=", "autonomy="])
-    except getopt.GetoptError as exc:
-        usage()
+
+        # Parse known arguments up to stop_index
+        behavior_args = sys.argv[1:stop_index]
+        node_args = sys.argv[stop_index:]
+        args = parser.parse_args(behavior_args)
+
+    except Exception as exc:
+        parser.print_help()
         print(exc)
-        print("Continue after exception ")
+        sys.exit(-1)
 
-    behavior = ""
-    autonomy = 255
+    behavior = args.behavior if args.behavior else ""
+    autonomy = args.autonomy
+    auto_start = args.autostart
 
-    if opts:
-        for opt, arg in opts:
-            if opt in ("-h", "--help"):
-                usage()
-                sys.exit()
-            elif opt in ("-b", "--behavior"):
-                behavior = arg
-            elif opt in ("-a", "--autonomy"):
-                autonomy = int(arg)
-    ignore_args = ['__node', '__log']  # auto-set by roslaunch
+    print(f"Behavior launcher with behavior'{behavior}' autonomy={autonomy} auto_start={auto_start}\n"
+          f"    behavior args='{behavior_args}'\n    node_args='{node_args}'", flush=True)
 
     print("Set up behavior_launcher ROS connections ...", flush=True)
-    node_args = sys.argv[stop_index:]
     rclpy.init(args=node_args,
                signal_handler_options=rclpy.signals.SignalHandlerOptions.NO)  # We will handle shutdown
 
     launcher = BehaviorLauncher()
-    executor = rclpy.executors.SingleThreadedExecutor()
+    executor = rclpy.executors.MultiThreadedExecutor(num_threads=2)
     executor.add_node(launcher)
 
     if behavior != "":
-        print(f"Set up behavior_launcher with '{behavior}' ...", flush=True)
-        for _ in range(100):
-            # Let stuff get going before launching behavior request
+        Logger.info(f"Set up behavior_launcher to launch '{behavior}' ({auto_start})...")
+        prior_clock = launcher.get_clock().now()
+        while launcher._last_onboard_heartbeat is None:
+            # Wait for confirmation that Onboard Behavior Engine is running
+            # before launching behavior request
+            if (launcher.get_clock().now() - prior_clock).nanoseconds > 2e9:
+                Logger.info(f"Waiting for onboard behavior engine before launching '{behavior}' ...")
+                prior_clock = launcher.get_clock().now()
             executor.spin_once(timeout_sec=0.001)
 
+        while not launcher._ready_event.is_set():
+            # If READY signal not received
+            if launcher._last_heartbeat_msg and auto_start:
+                # After getting heart beat message,
+                # then presume ready if auto_start is set and no behavior is reported active
+                if (launcher._last_heartbeat_msg.behavior_id == 0 and
+                    len(launcher._last_heartbeat_msg.current_state_checksums) == 0):
+                        Logger.info('No behavior is currently active on startup '
+                                                   'so presume ready and start new behavior!')
+                        launcher._ready_event.set()
+                else:
+                    if (launcher.get_clock().now() - prior_clock).nanoseconds > 2e9:
+                        Logger.warning('Cannot launch behavior while prior behavior is active'
+                                                   f' (id={launcher._last_heartbeat_msg.behavior_id} ...')
+                        prior_clock = launcher.get_clock().now()
+            else:
+                # Wait for confirmed ready signal if not autostarting
+                if (launcher.get_clock().now() - prior_clock).nanoseconds > 2e9:
+                    Logger.warning(f"Waiting for onboard behavior engine ready status signal '{behavior}' ...")
+                    prior_clock = launcher.get_clock().now()
+            executor.spin_once(timeout_sec=0.001)
+
+        Logger.info('Prepare behavior launch request for Onboard behavior Engine ...')
+        ignore_args = ['__node', '__log']  # auto-set by roslaunch
         request = BehaviorRequest(behavior_name=behavior, autonomy_level=autonomy)
-        for arg in args:
+        for arg in behavior_args:
             if ':=' not in arg:
                 continue
             key, val = arg.split(':=', 1)
@@ -276,12 +306,12 @@ def behavior_launcher_main(node_args=None):
                 continue
             request.arg_keys.append('/' + key)
             request.arg_values.append(val)
-        print(f"Add callback request for '{behavior}' ...", flush=True)
         executor.spin_once(timeout_sec=0.001)
 
         # Set up a callable as a future task so we don't block before starting to spin
         def initial_request():
             return launcher._request_callback(request)
+        Logger.info(f"Create task to start behavior '{behavior}' ...")
         future = executor.create_task(initial_request)
     else:
         future = None
@@ -289,7 +319,7 @@ def behavior_launcher_main(node_args=None):
     try:
         # Wait for ctrl-c to stop the application
         if future:
-            print("Run initial request of behavior_launcher spinner ...", flush=True)
+            Logger.info("Run initial request of behavior_launcher spinner ...")
             executor.spin_until_future_complete(future, timeout_sec=10.0)
             if future.done():
                 Logger.info("Initial behavior launcher request is sent!")
