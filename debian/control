@@ -1,0 +1,12 @@
+Source: ros-iron-flexbe-onboard
+Section: misc
+Priority: optional
+Maintainer: Philipp Schillinger <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), python3-pytest <!nocheck>, ros-iron-ament-copyright <!nocheck>, ros-iron-ament-flake8 <!nocheck>, ros-iron-ament-pep257 <!nocheck>, ros-iron-flexbe-core, ros-iron-flexbe-msgs, ros-iron-flexbe-states, ros-iron-launch-ros, ros-iron-launch-testing <!nocheck>, ros-iron-rclpy, ros-iron-ros-workspace, python3-all, python3-setuptools, dh-python
+Homepage: http://ros.org/wiki/flexbe_core
+Standards-Version: 3.9.2
+
+Package: ros-iron-flexbe-onboard
+Architecture: any
+Depends: ${python3:Depends}, ${misc:Depends}, ros-iron-flexbe-core, ros-iron-flexbe-msgs, ros-iron-flexbe-states, ros-iron-launch-ros, ros-iron-rclpy, ros-iron-ros-workspace
+Description: flexbe_onboard implements the robot-side of the behavior engine from where all behaviors are started.
