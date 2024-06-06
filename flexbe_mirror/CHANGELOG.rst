@@ -1,6 +1,18 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.3 (2024-06-06)
+------------------
+
+3.0.2 (2024-06-04)
+------------------
+* flake8/pycodestyle cleanup
+
+3.0.1 (2024-05-31)
+------------------
+* stop mirror thread on BEStatus FAILED or ERROR to reset current behavior id to prevent out of sync spam
+* remove unnecessary entry points (#15)
+
 3.0.0 (2024-05-01)
 ------------------
 * update with state map and changes to concurrent handling
@@ -14,6 +26,9 @@ Changelog for package flexbe_mirror
 * update behavior for UI if internal concurrent returns
 * refactor mirror handling
 * adding state_id handling; pre-building ContainerStructure to set IDs
+
+2.3.4 (2024-05-01)
+------------------
 
 2.3.3 (2023-08-09)
 ------------------
@@ -34,19 +49,6 @@ Changelog for package flexbe_mirror
 * flake8 cleanup; make test consistent
 * protect against build farm timing issue
 * updates to dependencies for ROS build farm
-* clean up some spam to FlexBE App console and just send to local terminal and log
-
-2.3.4 (2024-05-01)
-------------------
-* 2.3.3
-* update to protect against executor calls after unsubscribe/shutdown
-* streamline pub/sub for mirror; cleanup on behavior shutdown
-* destroy sub/pub/client in executor thread; use SingleThreadedExecutor without callback groups; use basic pub/sub for onboard; cleanup
-* 2.3.2
-* 2.3.1
-* 2.3.0
-* flake8 cleanup; make test consistent; protect against build farm timing issue
-* Updates to dependencies for ROS build farm
 * clean up some spam to FlexBE App console and just send to local terminal and log
 
 2.2.0 (2023-06-29)
