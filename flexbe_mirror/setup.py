@@ -1,13 +1,13 @@
 """Setup script for flexbe_mirror package."""
 
-from setuptools import setup
 from setuptools import find_packages
+from setuptools import setup
 
 PACKAGE_NAME = 'flexbe_mirror'
 
 setup(
     name=PACKAGE_NAME,
-    version='3.0.0',
+    version='3.0.3',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
@@ -22,8 +22,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'flexbe_mirror = flexbe_mirror.flexbe_mirror',
-            'mirror_state = flexbe_mirror.mirror_state',
             'behavior_mirror_sm = flexbe_mirror.behavior_mirror_sm:main'
         ],
     },
