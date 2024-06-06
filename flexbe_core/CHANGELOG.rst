@@ -1,6 +1,17 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.3 (2024-06-06)
+------------------
+
+3.0.2 (2024-06-04)
+------------------
+* flake8/pycodestyle cleanup
+
+3.0.1 (2024-05-31)
+------------------
+* Add parsing check to handle exceptions in manifest
+
 3.0.0 (2024-05-01)
 ------------------
 * update with state map and changes to concurrent handling
