@@ -1,8 +1,34 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.0.2 (2025-11-08)
+------------------
+* update test set up for colcon testing and build farm
+
+4.0.1 (2024-09-26)
+------------------
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+
+3.0.7 (2024-08-24)
+------------------
+
+3.0.6 (2024-08-05)
+------------------
+
+3.0.5 (2024-07-02)
+------------------
+
+3.0.4 (2024-07-02)
+------------------
+
 3.0.3 (2024-06-06)
 ------------------
+* Update preparing for Jazzy release
 
 3.0.2 (2024-06-04)
 ------------------
