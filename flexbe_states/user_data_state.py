@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
+# Copyright 2024 Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -12,7 +12,7 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#    * Neither the name of the Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -28,36 +28,29 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""PublisherStringState."""
+"""UserdataState."""
+import copy
+
 from flexbe_core import EventState
-from flexbe_core.proxy import ProxyPublisher
-
-from std_msgs.msg import String
 
 
-class PublisherStringState(EventState):
+class UserdataState(EventState):
     """
-    Publishes a string (std_msgs/String) message on a given topic name.
+    A state that posts data onto the userdata stream.
 
-    -- topic    string        The topic on which should be published.
+    -- data         object  The data to be posted
 
-    >= value                  Value of string.
-
-    <= done                   Done publishing.
+    <= done                 Indicates that data was posted
+    ># data         object  A copy of the data
     """
 
-    def __init__(self, topic):
-        """Initialize the instance."""
-        super(PublisherStringState, self).__init__(outcomes=['done'], input_keys=['value'])
-        self._topic = topic
-        self._pub = ProxyPublisher({self._topic: String})
+    def __init__(self, data):
+        super(UserdataState, self).__init__(outcomes=['done'],
+                                            output_keys=['data'])
+        self._data = data
 
     def execute(self, userdata):
-        """Return done on first execution."""
+        """Execute UserdataState."""
+        # Post data to userdata and return done.
+        userdata.data = copy.copy(self._data)
         return 'done'
-
-    def on_enter(self, userdata):
-        """Publish the string on entering state."""
-        val = String()
-        val.data = userdata.value
-        self._pub.publish(self._topic, val)
