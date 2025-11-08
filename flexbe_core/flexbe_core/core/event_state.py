@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -58,7 +58,6 @@ class EventState(OperatableState):
         self.__execute = self.execute
         self.execute = self._event_execute
 
-        self._entering = True
         self._skipped = False
         self._paused = False
         self._last_active_container = None
@@ -88,6 +87,7 @@ class EventState(OperatableState):
 
         if self._entering:
             self._entering = False
+            self._exited = False
             self._last_outcome = None
             self.on_enter(*args, **kwargs)
 
@@ -105,9 +105,18 @@ class EventState(OperatableState):
             self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='repeat'))
             repeat = True
 
-        if repeat or outcome is not None and not PreemptableState.preempt:
-            self._entering = True
+        if repeat or outcome is not None:
+            # As this is currently coded, a repeat command will immediately halt
+            # call on_exit, then reenter the state
+            # (vs. an alternative to wait until outcome and then repeat)
             self.on_exit(*args, **kwargs)
+            self._exited = True
+            self._entering = True  # for next call
+            if repeat:
+                outcome = None  # clear outcome so we stay on this state
+            else:
+                # Publish outcome for this state
+                self._publish_outcome(outcome)
 
         self._last_outcome = outcome
         return outcome
