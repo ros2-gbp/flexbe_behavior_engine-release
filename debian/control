@@ -1,0 +1,12 @@
+Source: ros-kilted-flexbe-behavior-engine
+Section: misc
+Priority: optional
+Maintainer: Philipp Schillinger <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), ros-kilted-ament-cmake, ros-kilted-flexbe-core, ros-kilted-flexbe-input, ros-kilted-flexbe-mirror, ros-kilted-flexbe-msgs, ros-kilted-flexbe-onboard, ros-kilted-flexbe-states, ros-kilted-flexbe-testing, ros-kilted-flexbe-widget, ros-kilted-ros-workspace
+Homepage: http://ros.org/wiki/flexbe
+Standards-Version: 3.9.2
+
+Package: ros-kilted-flexbe-behavior-engine
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kilted-flexbe-core, ros-kilted-flexbe-input, ros-kilted-flexbe-mirror, ros-kilted-flexbe-msgs, ros-kilted-flexbe-onboard, ros-kilted-flexbe-states, ros-kilted-flexbe-testing, ros-kilted-flexbe-widget, ros-kilted-ros-workspace
+Description: A meta-package to aggregate all the FlexBE packages
