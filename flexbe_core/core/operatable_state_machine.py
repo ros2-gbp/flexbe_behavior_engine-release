@@ -112,6 +112,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         """Calculate all state ids and prepare the ContainerStructure message."""
         self._state_map = StateMap()
         self._structure = self._build_structure_msg()
+        print(f'\x1b[94mBuilt {self._state_map}\x1b[0m', flush=True)
 
     def _build_structure_msg(self):
         """Create a message to describe the structure of this state machine."""
@@ -179,25 +180,53 @@ class OperatableStateMachine(PreemptableStateMachine):
 
     # execution
     def _execute_current_state(self):
-        # catch any exception and keep state active to let operator intervene
+
+        if self._entering:
+            # On entering this state machine
+            Logger.localerr(f"OSM: Why is entering flag set here '{self.name}' of '{self.path}'?")
+            raise Exception("entering flag still set L187 of OSM - '{self.path}'")
+
+        self._manual_transition_requested = None
+        if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
+            # Special handling in statemachine container
+            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+
+            if command_msg.target == self.name:
+                cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
+                assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
+                Logger.localinfo(f"Statemachine '{self.name}' from '{self.path}' is "
+                                 f"handling the transition cmd msg='{command_msg}'")
+
+                self._force_transition = True
+                outcome = self.outcomes[command_msg.outcome]
+                self._manual_transition_requested = outcome
+                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                  CommandFeedback(command='transition',
+                                                  args=[command_msg.target, self.name]))
+                Logger.localwarn(f"--> Manually triggered outcome {outcome} of statemachine '{self.name}'")
+                self._last_outcome = outcome
+                self._publish_outcome(outcome)
+                return outcome
+
+        if self._is_controlled and self._last_requested_outcome is not None:
+            # We have already processed the current state and received an outcome
+            # We are waiting on outcome confirmation from the OCS
+            Logger.localinfo(f"OSM '{self.path}' is waiting on user to confirm outcome")
+            return None
+
         try:
-            # --- @TODO remove self._inner_sync_request = False  # clear any prior sync request
             outcome = super()._execute_current_state()
             self._last_exception = None
         except Exception as exc:  # pylint: disable=W0703
-            # Error here
+            # catch any exception and log here, but re-raise to stop behavior
             outcome = None
             self._last_exception = exc
-            Logger.logerr('Failed to execute state %s:\n%s' % (self.current_state_label, str(exc)))
+            Logger.logerr("Failed to execute state '%s':\n%s" % (self.current_state_label, str(exc)))
             import traceback  # pylint: disable=C0415
             Logger.localinfo(traceback.format_exc().replace('%', '%%'))  # Guard against exeception including format!
+            raise exc
 
         if self._is_controlled:
-            # reset previously requested outcome if applicable
-            if self._last_requested_outcome is not None and outcome is None:
-                self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
-                self._last_requested_outcome = None
-
             # request outcome because autonomy level is too low
             if not self._force_transition and self.parent is not None:
                 # This check is not relevant to top-level state machines
@@ -207,15 +236,15 @@ class OperatableStateMachine(PreemptableStateMachine):
                         self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
                                           OutcomeRequest(outcome=self.outcomes.index(outcome),
                                                          target=self.path))
-                        Logger.localinfo("<-- Want result: '%s' -> '%s'" % (self.name, outcome))
+                        Logger.localinfo("<-- Want result: '%s' -> '%s'" % (self.path, outcome))
                         StateLogger.log('flexbe.operator', self, type='request', request=outcome,
                                         autonomy=self.parent.autonomy_level,
                                         required=self.parent.get_required_autonomy(outcome, self))
                         self._last_requested_outcome = outcome
                     outcome = None
 
-            # autonomy level is high enough, report the executed transition
-            elif outcome is not None and outcome in self.outcomes:
+            if outcome is not None and outcome in self.outcomes:
+                Logger.localinfo(f"controlled SM '{self.name}' from '{self.path}'returning outcome '{outcome}' ")
                 self._publish_outcome(outcome)
                 self._force_transition = False
 
@@ -377,17 +406,21 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo('<-- Sent attach confirm.')
 
     def _mirror_structure_callback(self, msg):
-        if self._structure:
-            Logger.localinfo(f'--> Sending behavior structure to mirror id={msg.data} ...')
-            self._pub.publish(Topics._MIRROR_STRUCTURE_TOPIC, self._structure)
-            self._inner_sync_request = True
-            # enable control of states since a mirror is listening
-            self._enable_ros_control()
+        sm_struct = self._structure
+        if sm_struct:
+            if sm_struct.behavior_id == msg.data:
+                Logger.localinfo(f'--> Sending behavior structure to mirror id={msg.data} ...')
+                self._pub.publish(Topics._MIRROR_STRUCTURE_TOPIC, sm_struct)
+                self._inner_sync_request = True
+                # enable control of states since a mirror is listening
+                self._enable_ros_control()
+            else:
+                Logger.localinfo(f"Structure for '{self.name}' id={sm_struct.behavior_id} mismatch "
+                                 f' with request from mirror id={msg.data} - ignore request!')
         else:
             Logger.logwarn(f"No structure defined for '{self.name}'! - nothing sent to mirror.")
 
     # handle state events
-
     def _notify_start(self):
         super()._notify_start()
 
@@ -411,13 +444,28 @@ class OperatableStateMachine(PreemptableStateMachine):
         super()._notify_stop()
         self._structure = None  # Flag for destruction
 
-    def on_exit(self, userdata):
+    def on_enter(self, userdata=None):  # pylint: disable=W0613
+        """Call on entering the operatable state machine."""
+        Logger.localinfo(f"OSM on enter for '{self.name}' from '{self.path}' ...")
+        self._last_exception = None
+        self._last_requested_outcome = None
+        super().on_enter(userdata)
+
+    def on_exit(self, userdata=None):
         """Call on exiting the statemachine."""
+        Logger.localinfo(f"SM on exit for '{self.name}' from '{self.path}' ...")
+        self._entering = True
         if self._current_state is not None:
-            udata = UserData(reference=self.userdata,
-                             input_keys=self._current_state.input_keys,
-                             output_keys=self._current_state.output_keys,
-                             remap=self._remappings[self._current_state.name])
+            with UserData(reference=self._userdata,
+                          input_keys=self._current_state.input_keys,
+                          output_keys=self._current_state.output_keys,
+                          remap=self._remappings[self._current_state.name]) as udata:
+                # Pass userdata to internal states matching as defined in state_machine
+                self._current_state.on_exit(udata)
             self._current_state._entering = True
-            self._current_state.on_exit(udata)
             self._current_state = None
+
+        if self._last_requested_outcome is not None:
+            Logger.localinfo(f"SM '{self.name}' of '{self.path}' clear prior LRO='{self._last_requested_outcome}'.")
+            self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
+            self._last_requested_outcome = None
