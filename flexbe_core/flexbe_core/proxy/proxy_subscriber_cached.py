@@ -132,7 +132,7 @@ class ProxySubscriberCached:
                                                         'callbacks': defaultdict(None),
                                                         'subscribers': [inst_id]}
 
-            Logger.localinfo(f"Created subscription for '{topic}' with message type '{msg_type.__name__}'!")
+            # Logger.localinfo(f"Created subscription for '{topic}' with message type '{msg_type.__name__}'!")
 
         else:
             with ProxySubscriberCached._subscription_lock:
@@ -143,14 +143,14 @@ class ProxySubscriberCached:
                         # Since we don't throw TypeErrors based on isinstance, and count on Python's duck typing
                         # for callbacks, we will ignore on FlexBE side for subscribers
                         if inst_id not in ProxySubscriberCached._topics[topic]['subscribers']:
-                            Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'"
-                                             ' - keep existing subscriber! ('
-                                             f"{len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                            # Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'"
+                            #                  ' - keep existing subscriber! ('
+                            #                  f"{len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                             ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
-                        else:
-                            Logger.localinfo(f"Existing subscription for '{topic}' with same message type name"
-                                             ' - keep existing subscriber! '
-                                             f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                        # else:
+                        #    Logger.localinfo(f"Existing subscription for '{topic}' with same message type name"
+                        #                     ' - keep existing subscriber! '
+                        #                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                     else:
                         Logger.info(f'Mis-matched msg_types ({msg_type.__name__} vs. '
                                     f"{ProxySubscriberCached._topics[topic]['subscription'].msg_type.__name__})"
@@ -158,13 +158,13 @@ class ProxySubscriberCached:
                         raise TypeError(f"Trying to replace existing subscription with different msg type for '{topic}'")
                 else:
                     if inst_id not in ProxySubscriberCached._topics[topic]['subscribers']:
-                        Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'!  "
-                                         f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                        # Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'!  "
+                        #                  f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                         ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
-                    else:
-                        Logger.localinfo(f"Existing subscription for '{topic}' with same message type "
-                                         '- keep existing subscriber! '
-                                         f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                    # else:
+                    #    Logger.localinfo(f"Existing subscription for '{topic}' with same message type "
+                    #                     '- keep existing subscriber! '
+                    #                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
 
         # Register the local callback for topic message
         if callback is not None:
@@ -293,12 +293,31 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if not ProxySubscriberCached._topics[topic]['buffered']:
-            Logger.warning('Attempted to access buffer of non-buffered topic!')
-            return None
-        if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
-            return None
-        return ProxySubscriberCached._topics[topic]['msg_queue'].popleft()
+        if cls.is_available(topic):
+            if not ProxySubscriberCached._topics[topic]['buffered']:
+                Logger.warning('Attempted to access buffer of non-buffered topic!')
+                return None
+            if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
+                return None
+            return ProxySubscriberCached._topics[topic]['msg_queue'].popleft()
+        return None
+
+    @classmethod
+    def peek_at_buffer(cls, topic):
+        """
+        Peek at the oldest buffered message of the given topic, but leave in queue.
+
+        @type topic: string
+        @param topic: The topic of interest.
+        """
+        if cls.is_available(topic):
+            if not ProxySubscriberCached._topics[topic]['buffered']:
+                Logger.warning('Attempted to access buffer of non-buffered topic!')
+                return None
+            if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
+                return None
+            return ProxySubscriberCached._topics[topic]['msg_queue'][0]
+        return None
 
     @classmethod
     def has_msg(cls, topic):
@@ -320,7 +339,9 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        return len(ProxySubscriberCached._topics[topic]['msg_queue']) > 0
+        if cls.is_available(topic):
+            return len(ProxySubscriberCached._topics[topic]['msg_queue']) > 0
+        return False
 
     @classmethod
     def remove_last_msg(cls, topic, clear_buffer=False):
@@ -347,7 +368,7 @@ class ProxySubscriberCached:
     @classmethod
     def make_persistant(cls, topic):
         """
-        Make the given topic persistant which means messages can no longer be removed.
+        Make the given topic persistent which means messages can no longer be removed.
 
         Remove_last_msg will have no effect, only overwritten by a new message.
 
