@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -46,9 +46,11 @@ from flexbe_core.core.topics import Topics
 from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorRequest
 from flexbe_msgs.msg import BehaviorSelection, BehaviorSync
 from flexbe_msgs.msg import ContainerStructure
+from flexbe_msgs.msg import StateMapMsg
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 
 from rosidl_runtime_py import get_interface_path
 
@@ -77,6 +79,10 @@ class BehaviorLauncher(Node):
         self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 100)
         self._mirror_pub = self.create_publisher(ContainerStructure, Topics._MIRROR_STRUCTURE_TOPIC, 100)
         self._heartbeat_pub = self.create_publisher(Int32, Topics._LAUNCHER_HEARTBEAT_TOPIC, 2)
+
+        # Latch state map so we can retrieve later if desired
+        latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_OCS_TOPIC, latching_qos)
 
         self._behavior_lib = BehaviorLibrary(self)
 
@@ -120,10 +126,6 @@ class BehaviorLauncher(Node):
         if not self._ready_event.is_set():
             Logger.logerr('Behavior engine is not ready - cannot process start request!')
         else:
-            # self._ready_event.clear()  # require a new ready signal after publishing
-            # thread = threading.Thread(target=self._process_request, args=[msg])
-            # thread.daemon = True
-            # thread.start()
             # Not waiting in process request, so safe to not block callback
             self._process_request(msg)
 
@@ -160,23 +162,28 @@ class BehaviorLauncher(Node):
                 else:
                     be_selection.arg_keys.append(k)
                     be_selection.arg_values.append(v)
-        except Exception as exc:
+        except Exception as exc:  # noqa: B902
             self.get_logger().warn('Failed to parse and substitute behavior arguments, '
                                    f'will use direct input.\n {type(exc)} - {str(exc)}')
             be_selection.arg_keys = msg.arg_keys
             be_selection.arg_values = msg.arg_values
 
-        container_map = StateMap()
-        be_structure = ContainerStructure()
-        be_structure.containers = msg.structure
-        for container in be_structure.containers:
-            # self.get_logger().info(f'BELauncher: request_callback: adding container {container.path} ...')
-            container_map.add_state(container.path, container)
-        # self.get_logger().info(f"BELauncher: request_callback: {msg.structure}")
+        state_map = StateMap()
+        try:
+            be_structure = ContainerStructure()
+            be_structure.containers = msg.structure
+            for container in be_structure.containers:
+                state_map.add_state(container.path, container)
+            self.get_logger().info(f'Built Statemachine {state_map}')
+        except Exception as exc:  # noqa: B902
+            self.get_logger().info(f"Failed to build state map for container {behavior['name']} ")
+            self.get_logger().info(f'{exc}')
+            self.get_logger().info(f'{state_map}')
+            raise exc
 
         try:
             be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
-        except Exception:  # pylint: disable=W0703
+        except Exception:  # pylint: disable=W0703 # noqa: B902
             self.get_logger().error("Could not find behavior package '%s'" % (behavior['package']))
             self.get_logger().info('Have you built and updated your setup after creating the behavior?')
             self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
@@ -210,6 +217,17 @@ class BehaviorLauncher(Node):
                                                                    new_content=content))
 
         be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
+
+        try:
+            state_ids, state_paths = list(zip(*state_map.items))
+            state_map_msg = StateMapMsg(behavior_id=be_selection.behavior_id,
+                                        state_ids=state_ids,
+                                        state_paths=state_paths)
+            self._state_map_pub.publish(state_map_msg)  # Used by the WebUI
+
+        except Exception as exc:  # noqa: B902
+            self.get_logger().warn(f'Failed to publish state map from launcher!\n{exc}')
+
         if msg.autonomy_level != 255:
             be_structure.behavior_id = be_selection.behavior_id
             self._mirror_pub.publish(be_structure)
@@ -261,7 +279,7 @@ def behavior_launcher_main():
         node_args = sys.argv[stop_index:]
         args = parser.parse_args(behavior_args)
 
-    except Exception as exc:
+    except Exception as exc:  # pylint: disable=W0703 # noqa: B902
         parser.print_help()
         print(exc)
         sys.exit(-1)
@@ -349,21 +367,21 @@ def behavior_launcher_main():
         executor.spin()
     except KeyboardInterrupt:
         print(f'Keyboard interrupt request  at {datetime.now()} - ! Shut the behavior launcher down!', flush=True)
-    except Exception as exc:
+    except Exception as exc:  # noqa: B902
         print(f'Exception in executor       at {datetime.now()} - ! {type(exc)}\n  {exc}', flush=True)
         import traceback
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
     try:
         launcher.destroy_node()
-    except Exception as exc:  # pylint: disable=W0703
+    except Exception as exc:  # pylint: disable=W0703 # noqa: B902
         print(f'Exception from destroy behavior launcher node at {datetime.now()}: {type(exc)}\n{exc}', flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
     print(f'Done with behavior launcher at {datetime.now()}!', flush=True)
     try:
         rclpy.try_shutdown()
-    except Exception as exc:  # pylint: disable=W0703
+    except Exception as exc:  # pylint: disable=W0703 # noqa: B902
         print(f'Exception from rclpy.try_shutdown for behavior launcher: {type(exc)}\n{exc}', flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
