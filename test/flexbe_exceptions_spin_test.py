@@ -29,16 +29,42 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""FlexBE Core Exceptions."""
+"""Test setup."""
+import os
+import sys
+
+import launch
+
+import launch_testing.actions
+
+import pytest
 
 
-class StateError(Exception):
-    """State Error."""
+@pytest.mark.rostest
+def generate_test_description():
+    """Generate test description for flexbe_exceptions_spin_test."""
+    path_to_test = os.path.dirname(__file__)
 
+    test_proc_path = os.path.join(path_to_test, 'test_exceptions_spin.py')
 
-class StateMachineError(Exception):
-    """StateMachine Error."""
+    # This is necessary to get unbuffered output from the process under test
+    proc_env = os.environ.copy()
+    proc_env['PYTHONUNBUFFERED'] = '1'
 
+    test_exceptions = launch.actions.ExecuteProcess(
+        cmd=[sys.executable, test_proc_path],
+        env=proc_env,
+        output='screen',
+        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=15),
+        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=15)
+    )
 
-class UserDataError(Exception):
-    """UserData Error."""
+    return (
+        launch.LaunchDescription([
+            test_exceptions,
+            launch_testing.actions.ReadyToTest()
+        ]),
+        {
+            'test_exceptions': test_exceptions,
+        }
+    )
