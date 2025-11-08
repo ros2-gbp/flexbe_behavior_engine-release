@@ -13,9 +13,13 @@ Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)
 
 You may also want to check out the quick start tutorial demonstrations at [FlexBE Turtlesim Demo](https://github.com/FlexBE/flexbe_turtlesim_demo).
 
-![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg?branch=jazzy)
+![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg?branch=ros2-devel)
+
+Iron ![ROS Build Farm](https://build.ros2.org/job/Idev__flexbe_behavior_engine__ubuntu_jammy_amd64/badge/icon)
 
 Jazzy ![ROS Build Farm](https://build.ros2.org/job/Jdev__flexbe_behavior_engine__ubuntu_noble_amd64/badge/icon)
+
+Rolling ![ROS Build Farm](https://build.ros2.org/job/Rdev__flexbe_behavior_engine__ubuntu_noble_amd64/badge/icon)
 
 ## Installation
 
@@ -30,15 +34,33 @@ Next, navigate to the "ros2_ws" top-level directory and build FlexBE:
 
     colcon build
 
-Furthermore, create your own repository for behavior development (contains examples):
 
-    ros2 run flexbe_widget create_repo [your_project_name]
+## Creating new FlexBE Behavior packages
+
+To begin, create your own repository for behavior development in the `${WORKSPACE_ROOT}/src` folder:
+
+    `ros2 run flexbe_widget create_repo [your_project_name] <meta_package_name> <--non-interactive>`
+
+This will clone a project template (requires internet access) that contains examples and proper package definitions,
+and create the ROS 2 package structure and three subfolders.
+
+For example, running
+  `ros2 run flexbe_widget create_repo my_project my_flexbe_project`
+
+from the `${WORKSPACE_ROOT}/src` folder will create:
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project`
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_flexbe_project` - the ROS meta package
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_behaviors`
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_states`
+
+
+These are intended to contain your custom FlexBE state implementations and HFSM-based behaviors.
 
 This version of the flexbe_behavior_engine requires version 4.0+ of the FlexBE user interface.
 
 It is recommended to install the FlexBE user interface by following one of these steps:
+ * https://github.com/FlexBE/flexbe_webui.git - new Python-based webserver version (preferred)
  * https://github.com/FlexBE/flexbe_app.git - classic FlexBE App (iron or ros2-devel branches)
- * https://github.com/FlexBE/flexbe_webui.git - new Python-based webserver version
 
 
 ## Usage
@@ -62,7 +84,7 @@ For running tests use:
 
 ## Next Steps
 
-- Do some of the [tutorials](http://philserver.bplaced.net/fbe/documentation.php).
+- Do some of the [tutorials](http://flexbe.github.io).
 - Visit the [FlexBE GitHub Organization](https://github.com/FlexBE) for additional available states.
 
 - If you are converted an existing system from ROS 1 to ROS 2, we provide a
@@ -94,4 +116,4 @@ Let us know if you know a paper which should be added to the list.
 ## Maintainers
 
 - Philipp Schillinger ([@pschillinger](https://github.com/pschillinger), [Contact](http://philserver.bplaced.net/fbe/contact.php))
-- David Conner ([@dcconner](https://github.com/dcconner))
+- David Conner ([@dcconner](https://github.com/dcconner)) [Contact](https://flexbe.readthedocs.io/en/latest/contactinfo.html)
