@@ -29,24 +29,26 @@
 
 """Class to handle the FlexBE mirror of onboard statemachine."""
 
+import threading
+import time
+import traceback
+from collections import deque
+
 try:
     from prctl import set_name as set_thread_name
 except Exception:
     def set_thread_name(name):
         """Set thread name dummy function if prctl not defined."""
-        print('Python thread names are not visible in ps/top unless you install prctl')
+        # print('Python thread names are not visible in ps/top unless you install prctl')
+        pass
 
-import threading
-import time
-import traceback
-
-from flexbe_core import Logger, MIN_UI_VERSION
+from flexbe_core import Logger, MIN_UI_VERSION, initialize_flexbe_core
 from flexbe_core.core import LockableStateMachine, OperatableStateMachine
-from flexbe_core.core import PreemptableState, PreemptableStateMachine, StateMap
+from flexbe_core.core import PreemptableState, State, StateMap
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 
-from flexbe_msgs.msg import BEStatus, BehaviorSync, ContainerStructure
+from flexbe_msgs.msg import BEStatus, BehaviorSync, ContainerStructure, StateMapMsg
 
 from rclpy.clock import Clock
 from rclpy.node import Node
@@ -58,6 +60,19 @@ from .mirror_concurrency_container import MirrorConcurrencyContainer
 from .mirror_state import MirrorState
 from .mirror_state_machine import MirrorStateMachine
 
+bestatus_map = {
+    BEStatus.STARTED: 'STARTED',
+    BEStatus.FINISHED: 'FINISHED',
+    BEStatus.FAILED: 'FAILED',
+    BEStatus.LOCKED: 'LOCKED',
+    BEStatus.WAITING: 'WAITING',
+    BEStatus.SWITCHING: 'SWITCHING',
+    BEStatus.WARNING: 'WARNING',
+    BEStatus.ERROR: 'ERROR',
+    BEStatus.READY: 'READY',
+    BEStatus.RUNNING: 'RUNNING',
+}
+
 
 class FlexbeMirror(Node):
     """Class to handle the FlexBE mirror of onboard statemachine."""
@@ -67,29 +82,28 @@ class FlexbeMirror(Node):
         super().__init__('flexbe_mirror')
 
         self._sm = None
-        ProxyPublisher.initialize(self)
-        ProxySubscriberCached.initialize(self)
-        Logger.initialize(self)
-
-        MirrorState.initialize_ros(self)
-        PreemptableState.initialize_ros(self)
-        PreemptableStateMachine.initialize_ros(self)
-        LockableStateMachine.initialize_ros(self)
+        initialize_flexbe_core(self)
 
         self._timing_event = threading.Event()  # Used for wait timer
 
+        # Keep track of mirror thread status
+        # starting one while other is stopping is valid,
+        # but only one thread should be running at a time
+        self._starting = False
         self._running = False
         self._stopping = False
+
+        self._last_obe_status = None
         self._active_id = BehaviorSync.INVALID
         self._starting_path = None
         self._current_struct = None
-        self._struct_buffer = []
+        self._struct_buffer = deque()
         self._sync_lock = threading.Lock()
         self._state_map = None
         self._system_clock = Clock()
         self._active_thread_start = None
 
-        # set up proxys for sm <--> GUI communication
+        # set up proxies for sm <--> GUI communication
         # publish topics
         self._heartbeat_pub = self.create_publisher(Int32, Topics._MIRROR_HEARTBEAT_TOPIC, 2)
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
@@ -109,11 +123,13 @@ class FlexbeMirror(Node):
 
         # Use proxy publisher/subscriber for access in states
         # but just initialize here once for all
-        self._beh_update_pub = ProxyPublisher({Topics._BEHAVIOR_UPDATE_TOPIC: String})
+        self._beh_update_pub = ProxyPublisher({Topics._BEHAVIOR_UPDATE_TOPIC: Int32})
 
         self._outcome_sub = ProxySubscriberCached()
         self._outcome_sub.subscribe(Topics._OUTCOME_TOPIC, UInt32, inst_id=id(self))
         self._outcome_sub.enable_buffer(Topics._OUTCOME_TOPIC)
+
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_OCS_TOPIC, latching_qos)
 
         # no clean way to wait for publisher to be ready...
         Logger.loginfo('--> Mirror - setting up publishers and subscribers ...')
@@ -125,13 +141,14 @@ class FlexbeMirror(Node):
         Logger.loginfo('--> Mirror - ready!')
 
     def _version_callback(self, msg):
+        """Check version required by behavior launcher."""
         vui = FlexbeMirror._parse_version(msg.data)
         vex = FlexbeMirror._parse_version(MIN_UI_VERSION)
         if vui < vex:
-            Logger.logwarn('FlexBE App needs to be updated!\n'
+            Logger.logwarn('FlexBE WebUI needs to be updated!\n'
                            f'Mirror requires at least version {MIN_UI_VERSION}, '
                            f' but you have {msg.data}\n'
-                           'Please update the flexbe_app software.')
+                           'Please update the flexbe_webui software.')
 
     @staticmethod
     def _parse_version(v):
@@ -140,14 +157,14 @@ class FlexbeMirror(Node):
         offset = 1
         for n in reversed(v.split('.')):
             result += int(n) * offset
-            offset *= 100
+            offset *= 1000
         return result
 
     def get_elapsed_str(self, start_time):
         """Return a truncated time string for debugging."""
         elapsed = self._system_clock.now() - start_time
         sec, nsec = start_time.seconds_nanoseconds()
-        return f'started at {sec & 0xFFFF}.{nsec//1000:06d} s (elapsed={elapsed.nanoseconds/1e9} s)'
+        return f'started at {sec & 0xFFFF}.{nsec // 1000:06d} s (elapsed={elapsed.nanoseconds / 1e9} s)'
 
     def heartbeat_timer_callback(self):
         """
@@ -169,52 +186,54 @@ class FlexbeMirror(Node):
             print(f"    Shutting down behavior mirror '{self._active_id}' ...", flush=True)
             with self._sync_lock:
                 self._stopping = True
-                if self._sm is not None and self._running:
-                    print(f"    Mirror '{self._active_id}' is shutting down with behavior still active!", flush=True)
-                    self._wait_stop_running(self._system_clock.now())
-
+                if self._sm is not None:
                     if self._running:
-                        print(f"    Failed to stop mirror '{self._active_id}' while it is already running!", flush=True)
-                        return False
-                    else:
-                        self._stopping = False
-                        self._active_id = BehaviorSync.INVALID
-                        self._sm = None
-                        self._current_struct = None
+                        print(f"    Mirror '{self._active_id}' is shutting down with behavior still active!", flush=True)
+                        self._wait_stop_running(self._system_clock.now())
+
+                        if self._running:
+                            # Re-check running after waiting to stop
+                            print(f"    Failed to stop mirror '{self._active_id}' while it is already running!", flush=True)
+                            return False
+
+                self._stopping = False
+                self._active_id = BehaviorSync.INVALID
+                self._sm = None
+                self._current_struct = None
 
                 print('    Stop heartbeat timer ...', flush=True)
                 self.destroy_timer(self._heartbeat_timer)
                 threading.Event().wait(0.05)
 
-                print('   Remove subscribers ...', flush=True)
+                print('   Remove proxy subscribers ...', flush=True)
                 self._outcome_sub.unsubscribe_topic(Topics._OUTCOME_TOPIC, inst_id=id(self))
 
-                print('   Remove publishers ...', flush=True)
+                print('   Remove proxy publishers ...', flush=True)
                 self._beh_update_pub.remove_publisher(Topics._BEHAVIOR_UPDATE_TOPIC)
 
                 print('    Mirror is shutdown!', flush=True)
                 return True
-            return False  # No active behavior
 
         except Exception as exc:  # pylint: disable=W0703
             print(f"Exception shutting down behavior mirror '{type(exc)}'\n   {exc}", flush=True)
             import traceback
             print(traceback.format_exc().replace('%', '%%'), flush=True)
+            return False
 
     def _mirror_structure_callback(self, msg):
+        """Process structure message and activate the mirror."""
         start_time = self._system_clock.now()
-        Logger.loginfo(f'--> Mirror - received updated structure with checksum id = {msg.behavior_id}')
-        Logger.localinfo(f'   at {start_time.nanoseconds} ns')
+        Logger.localinfo(f'--> Mirror - received updated structure with checksum id = {msg.behavior_id}'
+                         f'   at {start_time.nanoseconds} ns')
         thread = threading.Thread(target=self._activate_mirror, args=[msg, start_time],
                                   name=f'activate_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
         thread.daemon = True
         thread.start()
 
     def _activate_mirror(self, struct_msg, start_time):
+        """Process the mirror structure and begin execution if valid."""
         set_thread_name('act' + f'{start_time.nanoseconds}'[-12:])  # only 15 chars allowed
-
         with self._sync_lock:
-            Logger.loginfo(f'Activate mirror for behavior id = {struct_msg.behavior_id} ...')
             self._wait_stopping(start_time)
 
             if self._running:
@@ -222,67 +241,107 @@ class FlexbeMirror(Node):
                                  f'while mirror is already running with active id={self._active_id}; '
                                  'adding to buffer for later!')
                 self._struct_buffer.append(struct_msg)
+                self._starting = False
                 return
             elif self._active_id not in (BehaviorSync.INVALID, struct_msg.behavior_id):
                 Logger.localwarn(f'Received mirror structure id={struct_msg.behavior_id} that does '
                                  f'not match active id = {self._active_id} - will ignore!')
+                Logger.logwarn('Ignoring SM structure with mismatched id!')
+                self._starting = False
                 return
 
-            # At this point, either active_id is invalid or same behavior checksum id
-            Logger.localinfo(f'Process the updated mirror structure for checksum id = {struct_msg.behavior_id} ...')
-            self._active_id = struct_msg.behavior_id  # in case invalid
-            self._struct_buffer = []
+            # At this point, either active_id is invalid or same behavior checksum id, so make it active
+            self._struct_buffer.clear()  # Clear any stored structures and use this one
             self._mirror_state_machine(struct_msg)
             if self._sm:
                 Logger.localinfo(f'Mirror built for behavior id = {self._active_id}.')
                 self._sm.set_name('root')
-            else:
-                Logger.localwarn(f'Error processing mirror structure for behavior checksum id = {self._active_id} ...')
-                Logger.logwarn('Requesting a new mirror structure from onboard ...')
+            elif not self._starting:
+                Logger.logwarn(f'Error: Requesting a new mirror structure from onboard ({struct_msg.behavior_id})...')
                 self._request_struct_pub.publish(Int32(data=struct_msg.behavior_id))
-                self._active_id = struct_msg.behavior_id
+                self._starting = True  # Wait for message to retrigger
+                return
+            else:
+                Logger.localinfo('Error: cannot build mirror but we have already re-requested '
+                                 'structure before; ignore request to activate.')
                 return
 
+            # At this point the state machine is valid an we are ready to go
+            self._active_id = struct_msg.behavior_id  # in case invalid
             self._running = True  # Ready to start execution, so flag it as so before releasing sync
+            self._starting = False
 
         # Release sync lock and execute the mirror
-        Logger.localinfo(f"Mirror - begin execution of active mirror behavior id = '{self._sm.id}' "
-                         f'{self.get_elapsed_str(start_time)}')
-
         try:
             self._execute_mirror(start_time)
         except Exception as exc:  # pylint: disable=W0703
             Logger.logerr(f'Exception in activate mirror: {type(exc)} started at {start_time.nanoseconds} ns ...\n  {exc}')
             Logger.localerr(f"{traceback.format_exc().replace('%', '%%')}")
-            self._running = False  # normally set false in execute_mirror (but not if exeception)
+            self._running = False  # normally set false in execute_mirror (but not if exception)
 
         Logger.localwarn(f'Done executing mirror {self._active_id} from activation '
                          f'{self.get_elapsed_str(start_time)}')
 
     def _status_callback(self, msg):
-        start_time = self._system_clock.now()
-        if msg.code == BEStatus.STARTED:
-            Logger.localinfo(f'Mirror - received BEstate={msg.code} - start mirror')
-            #                      f'start mirror with behavior id = {msg.behavior_id} started at {start_time.nanoseconds} ns')
-            thread = threading.Thread(target=self._start_mirror, args=[msg, start_time],
-                                      name=f'start_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
-            thread.daemon = True
-            thread.start()
-        elif self._sm and msg.code in (BEStatus.ERROR, BEStatus.FAILED):
-            Logger.localinfo(f'Mirror - received BEstate={msg.code} - issue ocurred onboard - stop current mirror!')
-            thread = threading.Thread(target=self._stop_mirror, args=[msg, start_time],
-                                      name=f'stop_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
-            thread.daemon = True
-            thread.start()
-            Logger.logerr(f'Onboard error - stopped behavior mirror (code={msg.code})')
-        elif self._sm and not self._stopping and msg.code == BEStatus.FINISHED:
-            Logger.localinfo(f'Mirror - received BEstate={msg.code} - stop current mirror')
-            thread = threading.Thread(target=self._stop_mirror, args=[msg, start_time],
-                                      name=f'stop_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
-            thread.daemon = True
-            thread.start()
+        """Set mirror to mimic behavior engine status."""
+        try:
+            self._last_obe_status = msg.code
+            start_time = self._system_clock.now()
+            if msg.code == BEStatus.STARTED:
+                # Start mirror using latest structure.
+                Logger.localinfo(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code}) '
+                                 f'start mirror with behavior id = {msg.behavior_id} started at {start_time.nanoseconds} ns'
+                                 f'({self._starting}, {self._running}, {self._stopping}')
+                self._starting = False  # Clear starting flag on new START request
+                thread = threading.Thread(target=self._start_mirror, args=[msg, start_time],
+                                          name=f'start_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
+                thread.daemon = True
+                thread.start()
+            elif self._sm:
+                # We have valid state machine structure, respond according to status
+                if msg.code in (BEStatus.ERROR, BEStatus.FAILED):
+                    # Stop mirror on BE error or failure
+                    Logger.localinfo(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code})'
+                                     f' - stop current mirror! ({self._starting}, {self._running}, {self._stopping})')
+                    thread = threading.Thread(target=self._stop_mirror, args=[msg, start_time],
+                                              name=f'stop_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
+                    thread.daemon = True
+                    thread.start()
+                    Logger.logerr(f'Onboard error - stopped behavior mirror (code={msg.code})')
+                elif msg.code in (BEStatus.FINISHED, BEStatus.READY):
+                    # Onboard does not have an active SM, so stop if we are running
+                    self._starting = False  # Clear starting flag on new FINISHED or READY
+                    if not self._stopping:
+                        Logger.localinfo(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code})'
+                                         f' - stop current mirror! ({self._starting}, {self._running}, {self._stopping})')
+                        thread = threading.Thread(target=self._stop_mirror, args=[msg, start_time],
+                                                  name=f'stop_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
+                        thread.daemon = True
+                        thread.start()
+                    else:
+                        # Temporary debug
+                        Logger.localinfo(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code}) '
+                                         f' - normal with active SM ({self._starting}, {self._running}, {self._stopping})')
+
+                elif msg.code in (BEStatus.WARNING, ):
+                    Logger.logwarn(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code})'
+                                   f' ({self._starting}, {self._running}, {self._stopping})')
+                else:
+                    # otherwise normal
+                    Logger.localinfo(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code})'
+                                     f' normal active mode ({self._starting}, {self._running}, {self._stopping})')
+            else:
+                # Waiting for a new behavior, should be READY message (or STARTED handled above)
+                if msg.code not in (BEStatus.READY, ):
+                    Logger.localinfo(f'Mirror - received BEStatus={bestatus_map.get(msg.code, "UNKNOWN")} ({msg.code}) '
+                                     f' - no active SM ({self._starting}, {self._running}, {self._stopping})')
+                # Normal to receive periodic READY signals
+
+        except Exception as exc:
+            Logger.logerr(f"Exception in Mirror _status_callback callback: '{type(exc)}'\n    {exc}")
 
     def _start_mirror(self, msg, start_time):
+        """Call on STARTED command from OBE."""
         set_thread_name('str' + f'{start_time.nanoseconds}'[-12:])  # only 15 chars allowed
         with self._sync_lock:
             self._wait_stopping(start_time)
@@ -291,8 +350,6 @@ class FlexbeMirror(Node):
                 if self._active_id != msg.behavior_id:
                     Logger.loginfo(f'Tried to start mirror for id={msg.behavior_id} while'
                                    f' mirror for id={self._active_id} is already running - will ignore start request!')
-                    Logger.localwarn(f' (active thread started {self._active_thread_start}) '
-                                     f' {self.get_elapsed_str(start_time)}')
                 else:
                     Logger.localinfo(f' Received start request for already active {self._active_id} '
                                      f'(active thread started {self._active_thread_start}) '
@@ -304,29 +361,29 @@ class FlexbeMirror(Node):
             if len(msg.args) > 0:
                 self._starting_path = '/' + msg.args[0][1:].replace('/', '_mirror/') + '_mirror'
 
-            self._active_id = msg.behavior_id
             assert self._sm is None, ('No SM should be active with start command here '
-                                      f'(id = {self._active_id}, {self._sm.id}) {self.get_elapsed_str(start_time)}')
+                                      f'(current id = {self._active_id}, {self._sm.id}) {self.get_elapsed_str(start_time)}')
             if len(self._struct_buffer) > 0:
-                # Logger.localinfo(f'Building mirror structure for checksum id={msg.behavior_id} '
-                #                  f'current len(struct_buffer)={len(self._struct_buffer)} ...')
                 while self._sm is None and len(self._struct_buffer) > 0:
-                    struct = self._struct_buffer[0]
-                    self._struct_buffer = self._struct_buffer[1:]
-                    if struct.behavior_id == self._active_id:
+                    # Search buffer looking for desired structure
+                    struct = self._struct_buffer.popleft()
+                    if struct.behavior_id == msg.behavior_id:
                         self._mirror_state_machine(struct)
-                        Logger.localinfo(f"Mirror built for checksum '{self._active_id}'")
+                        Logger.localinfo(f"Mirror built for checksum '{msg.behavior_id}'")
                     else:
                         Logger.logwarn(f"Discarded mismatching buffered structure for checksum '{struct.behavior_id}'")
 
             if self._sm is None:
-                Logger.localwarn(f"Missing correct mirror structure for starting behavior checksum id ='{msg.behavior_id}'")
-                Logger.localwarn(f'   Canceling start request for behavior checksum id ={msg.behavior_id} '
-                                 f'{self.get_elapsed_str(start_time)}')
-                Logger.logwarn('Requesting mirror structure from onboard ...')
-                self._request_struct_pub.publish(Int32(data=msg.behavior_id))
-                self._active_id = msg.behavior_id
+                Logger.localwarn('Missing correct mirror structure for starting behavior '
+                                 f"checksum id ='{msg.behavior_id}'  ({self._starting}, {self._running}, {self._stopping})")
+                if not self._starting:
+                    Logger.logwarn('Requesting mirror structure from onboard ...')
+                    self._request_struct_pub.publish(Int32(data=msg.behavior_id))
+                self._starting = True
                 return
+
+            # We have a valid state machine
+            self._active_id = msg.behavior_id
 
             if self._sm._current_state is None:
                 try:
@@ -337,10 +394,9 @@ class FlexbeMirror(Node):
                     Logger.localwarn(f'Failed to set the initial state for checksum id ={msg.behavior_id}')
 
             self._running = True  # Ready to execute, so flag as running before releasing sync lock
+            self._starting = False
 
         try:
-            Logger.localinfo(f"Begin mirror execution for checksum '{self._active_id}' "
-                             f'{self.get_elapsed_str(start_time)}')
             self._execute_mirror(start_time)
         except Exception as exc:  # pylint: disable=W0703
             Logger.logerr(f'Exception in start_mirror: {type(exc)} ...\n  {exc}')
@@ -351,10 +407,7 @@ class FlexbeMirror(Node):
                          f'{self.get_elapsed_str(start_time)}')
 
     def _stop_mirror(self, msg, start_time):
-        # self.get_logger().info('--> Mirror - request to stop mirror for '
-        #                        f'checksum id={msg.behavior_id if isinstance(msg, BEStatus) else None} '
-        #                        f'- waiting for sync lock ...')
-
+        """Stop mirror from executing current structure."""
         set_thread_name('stp' + f'{start_time.nanoseconds}'[-12:])  # only 15 chars allowed
         with self._sync_lock:
             Logger.localinfo(f"Mirror '{self._active_id}' - stopping mirror "
@@ -366,16 +419,16 @@ class FlexbeMirror(Node):
                     Logger.logwarn('Onboard behavior stop request (from sync)!')
                 elif msg.code == BEStatus.FINISHED:
                     Logger.loginfo('Onboard behavior finished successfully.')
-                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String())
+                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=-1))
                 elif msg.code == BEStatus.SWITCHING:
                     self._starting_path = None
                     Logger.loginfo('Onboard performing behavior switch.')
                 elif msg.code == BEStatus.READY:
                     Logger.loginfo('Onboard engine just started, stopping currently running mirror.')
-                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String())
+                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=-1))
                 else:
                     Logger.logwarn('Onboard behavior failed!')
-                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String())
+                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=-1))
 
                 self._wait_stop_running(start_time)
 
@@ -391,29 +444,44 @@ class FlexbeMirror(Node):
 
             if msg is not None and msg.code != BEStatus.SWITCHING:
                 Logger.loginfo('\033[92m--- Behavior Mirror ready! ---\033[0m')
-
-            # Logger.localinfo('Mirror - stopped mirror for '
-            #                  f'behavior id={msg.behavior_id if msg is not None else BehaviorSync.INVALID} '
-            #                  f'- ready to release sync lock in stopping thread {self.get_elapsed_str(start_time)} s ...')
             self._stopping = False
+            self._starting = False
 
     def _sync_callback(self, msg):
+        """Call on sync request message."""
         start_time = self._system_clock.now()
         if msg.behavior_id == self._active_id:
             Logger.logwarn(f'--> Mirror - sync request for behavior id={msg.behavior_id} - restart mirror')
             thread = threading.Thread(target=self._restart_mirror, args=[msg, start_time])
             thread.daemon = True
             thread.start()
+
+            # Force a new update after sync
+            Logger.localinfo('\x1b[93mReceived sync for current behavior - request behavior update message\x1b[0m')
+            MirrorStateMachine._execute_flag = True  # Execute once more after any change,
+            self._sm._last_deep_states_list = None
+
         else:
-            Logger.error('--> Mirror - Cannot synchronize!\n    Different behavior is running onboard, '
-                         'please stop execution while we reset the mirror!')
-            Logger.localwarn(f'Cannot synchronize!  onboard checksum id={msg.behavior_id} active={self._active_id} '
-                             f'{self.get_elapsed_str(start_time)}')
-            thread = threading.Thread(target=self._stop_mirror, args=[None, start_time])
-            thread.daemon = True
-            thread.start()
+            Logger.localerr('Mirror synchronize request id='
+                            f'{msg.behavior_id} mismatch active= {self._active_id}')
+            if self._running:
+                Logger.localinfo('    stopping current mirror')
+                thread = threading.Thread(target=self._stop_mirror, args=[None, start_time])
+                thread.daemon = True
+                thread.start()
+
+            if self._last_obe_status in (BEStatus.RUNNING, BEStatus.STARTED, BEStatus.SWITCHING):
+                if not self._starting:
+                    Logger.logwarn(f'OBE is {bestatus_map[self._last_obe_status]}, '
+                                   'so request current mirror structure from onboard ...')
+                    self._request_struct_pub.publish(Int32(data=msg.behavior_id))
+                    self._starting = True
+                else:
+                    Logger.localwarn(f'OBE is {bestatus_map[self._last_obe_status]}, '
+                                     'but we have already re-requested mirror structure from onboard!')
 
     def _onboard_heartbeat_callback(self, msg):
+        """Call in response to onboard heartbeat."""
         try:
             """Use heartbeat to monitor for persistent sync issues."""
             if self._active_id == BehaviorSync.INVALID:
@@ -421,6 +489,7 @@ class FlexbeMirror(Node):
 
             if msg.behavior_id == self._active_id:
                 if self._sm is not None:
+                    # This is where we want to be
                     mirror_status = self._sm.get_latest_status()
                     if mirror_status.behavior_id != self._active_id:
                         Logger.localwarn(f'mirror_status.behavior_id ({mirror_status.behavior_id}) != '
@@ -439,28 +508,32 @@ class FlexbeMirror(Node):
                                 onboard_state_path = ob_state.path
 
                         if self._sync_heartbeat_mismatch_counter % 5 == 1:
-                            Logger.error(f'OCS is possibly out of sync - onboard state is {onboard_state_path}\n'
-                                         f'    Check UI and consider manual re-sync!\n'
-                                         '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
-                                         f' {self._sync_heartbeat_mismatch_counter}')
-                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id} : \n'
-                                             f'   Onboard IDs: {msg.current_state_checksums}\n    '
-                                             f'Mirror IDs {mirror_status.current_state_checksums}')
+                            Logger.localerr(f'OCS is possibly out of sync - onboard state is {onboard_state_path}\n'
+                                            f'    Check UI and consider manual re-sync!\n'
+                                            '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
+                                            f' {self._sync_heartbeat_mismatch_counter}')
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
+                                             f' {self._sync_heartbeat_mismatch_counter}: \n'
+                                             f'   Onboard IDs: {msg.current_state_checksums}\n'
+                                             f'    Mirror IDs: {mirror_status.current_state_checksums}')
+
+                            if self._sync_heartbeat_mismatch_counter % 20 == 1:
+                                Logger.info('Verify sync with onboard.')
 
                             for state_hash in msg.current_state_checksums:
                                 try:
                                     ob_state_id, ob_out = StateMap.unhash(state_hash)
                                     ob_state = self._state_map[ob_state_id]
-                                    Logger.localinfo(f"  onboard {ob_state_id} : '{ob_state.name}' "
-                                                     f'out={ob_out} - {ob_state.path}')
+                                    Logger.localinfo(f"  onboard {ob_state_id:10d} : '{ob_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={ob_out:3d} - {ob_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
                             for state_hash in mirror_status.current_state_checksums:
                                 try:
                                     mr_state_id, mr_out = StateMap.unhash(state_hash)
                                     mr_state = self._state_map[mr_state_id]
-                                    Logger.localinfo(f"  mirror {mr_state_id} : '{mr_state.name.replace('_mirror', '')}' "
-                                                     f" out={mr_out} - {mr_state.path.replace('_mirror', '')}")
+                                    Logger.localinfo(f"   mirror {mr_state_id:10d} : '{mr_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={mr_out:3d} - {mr_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for mirror state hash {state_hash} - {type(exc)} - {exc}')
                             Logger.localinfo(30 * '=')
@@ -469,6 +542,20 @@ class FlexbeMirror(Node):
                             # Start counting mismatches
                             self._sync_heartbeat_mismatch_counter = 1
                     else:
+                        if self._sync_heartbeat_mismatch_counter > 0:
+                            Logger.localwarn(f'OCS is back in sync after {self._sync_heartbeat_mismatch_counter} heartbeats')
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
+                                             f'   Onboard IDs: {msg.current_state_checksums}\n'
+                                             f'    Mirror IDs: {mirror_status.current_state_checksums}')
+                            for state_hash in msg.current_state_checksums:
+                                try:
+                                    ob_state_id, ob_out = StateMap.unhash(state_hash)
+                                    ob_state = self._state_map[ob_state_id]
+                                    Logger.localinfo(f"  onboard {ob_state_id:10d} : '{ob_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={ob_out:3d} - {ob_state.path.replace('_mirror', '')}")
+                                except Exception as exc:  # pylint: disable=W0703
+                                    Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
+
                         # Reset mismatch counter
                         self._sync_heartbeat_mismatch_counter = 0
                 elif self._active_id != 0:
@@ -494,8 +581,10 @@ class FlexbeMirror(Node):
             Logger.localinfo(f"{traceback.format_exc().replace('%', '%%')}")
 
     def _wait_stop_running(self, start_time):
+        """Send stop command to mirror SM and wait for running mirror thread to stop."""
         if self._running:
             PreemptableState.preempt = True
+            self._stopping = True
             running_cnt = 0
             timing_event = threading.Event()
             while self._running:
@@ -520,8 +609,11 @@ class FlexbeMirror(Node):
             Logger.localinfo(f'Mirror for active id {self._active_id} stopped running (start thread {self._active_thread_start}) '
                              f' ({running_cnt}) (this {self.get_elapsed_str(start_time)})')
             Logger.loginfo('Mirror stopped running!')
+            self._stopping = False  # We are done stopping with success
+            self._starting = False  # Clear for next structure request
 
     def _wait_stopping(self, start_time):
+        """Wait for stop command to complete."""
         if self._stopping:
             stopping_cnt = 0
             timing_event = threading.Event()
@@ -543,11 +635,17 @@ class FlexbeMirror(Node):
 
                 timing_event.wait(0.00002)  # use wall clock not sim time
             Logger.localinfo(f'Mirror completed stopping for active id {self._active_id} '
+                             f' ({self._starting}, {self._running}, {self._stopping})'
                              f' (this {self.get_elapsed_str(start_time)}) ({stopping_cnt})!')
-            Logger.loginfo('Mirror stopped.')
+            Logger.loginfo('Mirror stopped running.')
+            self._starting = False  # Clear for next structure request
 
     def _reinitialize_state_machine(self, state_machine):
-        """Reinitialize existing SM when restarting mirror during sync (faster than rebuilding current structure)."""
+        """
+        Reinitialize existing SM when restarting mirror during sync.
+
+        This is significantly faster than rebuilding current structure.
+        """
         state_machine._entering = False
         state_machine._current_state = None
         for state in state_machine._states:
@@ -556,42 +654,48 @@ class FlexbeMirror(Node):
                 self._reinitialize_state_machine(state)
 
     def _restart_mirror(self, msg, restart_time):
+        """Restart mirror to force resync with onboard."""
         set_thread_name('rsm' + f'{restart_time.nanoseconds}'[-12:])  # only 15 chars allowed
         with self._sync_lock:
             if self._sm is not None and self._running:
                 self._wait_stop_running(restart_time)
 
             Logger.localinfo(f'Restarting mirror for synchronization of behavior checksum id ={msg.behavior_id} '
-                             f'in thread {self.get_elapsed_str(restart_time)} ...')
+                             f'with active id={self._active_id}')
 
             # Clear existing outcome messages
             self._outcome_sub.remove_last_msg(Topics._OUTCOME_TOPIC, clear_buffer=True)
             MirrorState._last_state_id = None
             MirrorState._last_state_outcome = None
-
+            MirrorState._last_target_id = None  # reset any time that we build a new state machine
             try:
                 self._starting_path = None
                 if self._sm is not None and self._sm.id == msg.behavior_id:
-                    self._active_id = msg.behavior_id
-                    start = time.time()
                     PreemptableState.preempt = False  # Reset preempt flag before restarting
                     self._reinitialize_state_machine(self._sm)
-                    end = time.time()
                     Logger.localinfo(f'Done reinitializing the existing state machine with matching '
-                                     f"behavior id='{msg.behavior_id}' in thread "
-                                     f'{self.get_elapsed_str(restart_time)} (reinitialized in {end-start} seconds) ')
+                                     f"behavior id='{msg.behavior_id}' ")
                 else:
-                    # Reconstruct the state machine from structure
-                    self._mirror_state_machine(self._current_struct)
+                    if self._current_struct.behavior_id == msg.behavior_id:
+                        # Reconstruct the state machine from existing structure
+                        self._mirror_state_machine(self._current_struct)
+                    elif self._sm is not None:
+                        # Not running, but not the correct SM either
+                        Logger.localinfo(f'Discard mismatched behavior SM={self._sm.id} '
+                                         f"vs. requested behavior id='{msg.behavior_id}'")
+                        self._sm = None
+
                     if self._sm is None:
-                        Logger.localwarn(f'Missing correct mirror structure for restarting '
-                                         f'behavior checksum id ={msg.behavior_id}\n'
-                                         f'    Canceling restart request for behavior checksum id ={msg.behavior_id} '
-                                         f'in thread {self.get_elapsed_str(restart_time)} ')
-                        Logger.logwarn('Requesting mirror structure from onboard ...')
-                        self._pub.publish(Topics._REQUEST_STRUCTURE_TOPIC, Int32(data=msg.behavior_id))
-                        self._active_id = msg.behavior_id
+                        if not self._starting:
+                            Logger.logwarn('Requesting mirror structure from onboard ...')
+                            self._request_struct_pub.publish(Int32(data=msg.behavior_id))
+                        else:
+                            Logger.localwarn('Invalid SM cannot restart - mirror structure previously requested from onboard!')
                         return
+
+                assert self._sm.id == msg.behavior_id, ('Error in restart_mirror: '
+                                                        f'mismatched behavior SM={self._sm.id} '
+                                                        f'vs. requested behavior id={msg.behavior_id}')
 
                 Logger.localinfo(f' Reset active states using current state checksums: {msg.current_state_checksums}')
                 for active_state in msg.current_state_checksums:
@@ -631,16 +735,22 @@ class FlexbeMirror(Node):
                 Logger.localwarn(f" Restart SM with current top-level state = {curst.name if curst is not None else 'None'} "
                                  f'starting path={self._starting_path}')
                 Logger.localinfo(f'     active states = {self._sm.get_latest_status()}')
+                if self._sm._last_deep_states_list is not None and len(self._sm._last_deep_states_list) > 0:
+                    # Make sure we update the UI with latest state
+                    MirrorState.publish_update(self._sm._last_deep_states_list[-1].state_id)
+                    for st in self._sm._last_deep_states_list:
+                        Logger.localinfo(f"     '{st.name:30s}' - '{st.path}' ")
+                else:
+                    MirrorState.publish_update(curst.state_id)  # Make sure we update the UI with latest state
                 self._running = True  # set running while we have sync lock
+                self._starting = False
+                self._active_id = msg.behavior_id
             except (AttributeError, RuntimeError) as exc:
                 Logger.loginfo(f'Stopping synchronization because behavior{msg.behavior_id} has stopped.')
                 Logger.localinfo(f"'{type(exc)}' - {exc}")
                 return
 
         try:
-            Logger.localinfo('Execute mirror after sync lock of restart mirror'
-                             f" for synchronization of behavior '{msg.behavior_id}' from restart "
-                             f'in thread {self.get_elapsed_str(restart_time)} ...')
             self._execute_mirror(restart_time)
         except Exception as exc:  # pylint: disable=W0703
             Logger.logerr(f'Exception in restart_mirror in thread {self.get_elapsed_str(restart_time)}:\n    {type(exc)} - {exc}')
@@ -651,6 +761,8 @@ class FlexbeMirror(Node):
                          f'in thread {self.get_elapsed_str(restart_time)}.')
 
     def _execute_mirror(self, start_time):
+        """Run the mirrored SM structure and follow transitions to stay in sync with OBE."""
+        Logger.localinfo(f'Execute mirror behavior id ={self._active_id} ({self._sm.id})')
         if self._active_thread_start is not None:
             Logger.localwarn(f'Trying to start execution for {start_time.nanoseconds} but '
                              f'older {self._active_thread_start} is still active!')
@@ -667,9 +779,9 @@ class FlexbeMirror(Node):
             Logger.loginfo('Starting mirror in state ' + self._starting_path)
             self._starting_path = None
 
-        result = PreemptableStateMachine._preempted_name
+        result = State._preempted_name
         try:
-            result = self._sm.spin(start_time)
+            result = self._sm.spin(start_time, self._state_map)
             Logger.localinfo(f"Mirror finished spin with result '{result}' after {self.get_elapsed_str(start_time)} s")
             self._sm.destroy()
         except Exception as exc:
@@ -681,12 +793,13 @@ class FlexbeMirror(Node):
                 # so just try a simple print
                 print('\n(_execute_mirror Traceback): Caught exception on preempt:\n%s' % str(exc), flush=True)
                 print(traceback.format_exc().replace('%', '%%'), flush=True)
-            result = PreemptableStateMachine._preempted_name
+            result = State._preempted_name
 
         self._active_thread_start = None
         self._running = False
 
     def _mirror_state_machine(self, msg):
+        """Construct mirror of onboard state machine given structure."""
         start = time.time()  # Track construction time
         try:
             self._current_struct = msg
@@ -701,32 +814,48 @@ class FlexbeMirror(Node):
             self._add_node(msg, root)
 
             if self._sm:
+                Logger.localinfo('---------------------------------')
                 self._sm.id = msg.behavior_id
+                Logger.localinfo(f"Constructed mirror for behavior id ='{self._sm.id}' - begin validation ...")
                 # verify checksums of all states
-                # self.get_logger().info(f"Validate checksums for all states in '{root}' ...")
                 for con_msg in msg.containers:
                     if con_msg.path.find('/') != -1:
-                        hash_val = self._state_map.get_path_hash(con_msg.path)
-                        if hash_val:
-                            state = self._state_map[hash_val]
+                        state = self._state_map.get_state(con_msg.state_id)
+                        if state:
                             for path_seg in con_msg.path.split('/'):
+                                # state path contains mirror text, so just look for substring matches
                                 assert path_seg in state.path, (f'Mismatched state id={state.state_id} for {state.path} vs. '
-                                                                f'({hash_val}) {con_msg.path}')
+                                                                f'({con_msg.state_id}) {con_msg.path}')
+                        else:
+                            raise KeyError(f'State id {con_msg.state_id} not found in {self._state_map}!')
+
+                try:
+                    state_ids, state_paths = list(zip(*self._state_map.items))
+                    state_map_msg = StateMapMsg(behavior_id=self._sm.id,
+                                                state_ids=state_ids,
+                                                state_paths=[path.replace('_mirror', '') for path in state_paths])
+                    self._state_map_pub.publish(state_map_msg)  # Used by the WebUI
+                except Exception as exc:
+                    Logger.localerr(f'Failed to publish state map: {exc}')
+
                 end = time.time()
-                Logger.localinfo(f"Constructed mirror for behavior id ='{self._sm.id}' in {end - start} seconds !")
+                Logger.localinfo(f"Validated constructed mirror for behavior id ='{self._sm.id}' in {end - start} seconds !")
                 return  # success here
             else:
                 Logger.logerr(f'Failed to construct mirror SM for {root}!')
 
         except Exception as exc:
-            self.get_logger().warn(f"_mirror_statemachine Exception: '{type(exc)}' - {exc}")
-            self.get_logger().warn(f"{traceback.format_exc().replace('%', '%%')}")
+            Logger.localwarn(f"_mirror_statemachine Exception: '{type(exc)}' - {exc}")
+            if self._sm is not None:
+                Logger.localwarn(f'    destroy constructed SM id={self._sm.id} - failed validation!')
+                self._sm.destroy()
             self._sm = None
 
         end = time.time()
         Logger.localinfo(f"Failed to construct mirror of state machine '{msg.behavior_id}' in {end - start} seconds !")
 
     def _add_node(self, msg, path):
+        """Add node (state) to state machine graph based on type."""
         container = None
         for con_msg in msg.containers:
             if con_msg.path == path:
@@ -751,7 +880,7 @@ class FlexbeMirror(Node):
             else:
                 sm = MirrorStateMachine(container_name, path, outcomes=sm_outcomes)
 
-            self._state_map.add_state(path, sm)
+            self._state_map.add_state(path, sm)  # also calculates the state id given path
             assert sm.state_id == container.state_id, ('Failed to validate container state_id '
                                                        f'= {sm.state_id} vs. {container.state_id}')
 
@@ -765,14 +894,11 @@ class FlexbeMirror(Node):
                 MirrorStateMachine.add(container_name + '_mirror', sm, transitions=container_transitions)
             else:
                 # Add instance attributes to top-level state machine
-                sm._state_map = self._state_map
                 sm._total_loop_count = 0
-
                 self._sm = sm
 
         else:
             # Basic state
-            # self.get_logger().info(f"  Adding mirror state '{container_name}' at {path} ...")
             assert container.type == 0, f"'{container_name}' - Non-containers should have type 0 not {container.type}!"
             mrst = MirrorState(container_name, path, container.outcomes, container.autonomy)
             self._state_map.add_state(path, mrst)
@@ -781,6 +907,7 @@ class FlexbeMirror(Node):
             MirrorStateMachine.add(container_name + '_mirror', mrst, transitions=transitions)
 
     def _preempt_callback(self, msg):
+        """Call on receipt of preempt mirror message (ignored)."""
         # pylint: disable=unused-argument
         if self._sm is not None:
             Logger.logwarn('Explicit preempting is currently ignored, mirror should be preempted by onboard behavior.')
