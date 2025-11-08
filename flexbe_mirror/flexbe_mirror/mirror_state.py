@@ -96,12 +96,14 @@ class MirrorState(EventState):
         """Enter the mirror state."""
         self._entering = False
         self._last_outcome = None
+        self._last_execution = None
         MirrorState.publish_update(self._target_path)
 
     def on_exit_mirror(self, userdata, desired_outcome):
         """Exit mirror state."""
         try:
-            self._last_outcome = self.outcomes[desired_outcome]
+            if desired_outcome != -1:
+                self._last_outcome = self.outcomes[desired_outcome]
             return self._last_outcome
         except Exception as exc:  # pylint: disable=W0703
             Logger.localerr(f"Error: MirrorState execute for '{self.name}': "
