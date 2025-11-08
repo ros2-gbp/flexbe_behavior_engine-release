@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -28,40 +28,43 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""LogKeyState."""
-from flexbe_core import EventState, Logger
+
+"""Test setup."""
+import os
+import sys
+
+import launch
+
+import launch_testing.actions
+
+import pytest
 
 
-class LogKeyState(EventState):
-    """
-    A state that can log a predefined message including an input key.
+@pytest.mark.rostest
+def generate_test_description():
+    """Generate test description for flexbe_exceptions_spin_test."""
+    path_to_test = os.path.dirname(__file__)
 
-    The text should be a Python format string (e.g. 'Counter value:  {}'),
-    where {} is a placeholder replaced by the value of the userdata.data using the
-    text.format(userdata.data) command.
+    test_proc_path = os.path.join(path_to_test, 'test_exceptions_spin.py')
 
-    This can be used to precisely inform the operator about what happened to the behavior.
+    # This is necessary to get unbuffered output from the process under test
+    proc_env = os.environ.copy()
+    proc_env['PYTHONUNBUFFERED'] = '1'
 
-    -- text         string    Format string of message to be logged to the terminal; e.g., 'Counter value:  {}'.
-    -- severity     uint8     Type of logging (Logger.REPORT_INFO / WARN / HINT / ERROR)
+    test_exceptions = launch.actions.ExecuteProcess(
+        cmd=[sys.executable, test_proc_path],
+        env=proc_env,
+        output='screen',
+        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=15),
+        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=15)
+    )
 
-    #> data         object    The data provided to be printed in the message. The exact type depends on the request.
-
-    <= done                   Indicates that the message has been logged.
-    """
-
-    def __init__(self, text, severity=Logger.REPORT_HINT):
-        """Initialize LogKeyState."""
-        super(LogKeyState, self).__init__(outcomes=['done'],
-                                          input_keys=['data'])
-        self._text = text
-        self._severity = severity
-
-    def execute(self, userdata):
-        """Return done on first execution."""
-        # Already logged. No need to wait for anything.
-        return 'done'
-
-    def on_enter(self, userdata):
-        """Log upon entering the state."""
-        Logger.log(self._text.format(userdata.data), self._severity)
+    return (
+        launch.LaunchDescription([
+            test_exceptions,
+            launch_testing.actions.ReadyToTest()
+        ]),
+        {
+            'test_exceptions': test_exceptions,
+        }
+    )
