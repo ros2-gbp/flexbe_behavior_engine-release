@@ -1,3 +1,35 @@
+## flexbe_behavior_engine (kilted) - 4.0.2-1
+
+The packages in the `flexbe_behavior_engine` repository were released into the `kilted` distro by running `/usr/bin/bloom-release --new-track --track kilted --rosdistro kilted flexbe_behavior_engine` on `Sat, 08 Nov 2025 23:20:31 -0000`
+
+These packages were released:
+- `flexbe_behavior_engine`
+- `flexbe_core`
+- `flexbe_input`
+- `flexbe_mirror`
+- `flexbe_msgs`
+- `flexbe_onboard`
+- `flexbe_states`
+- `flexbe_testing`
+- `flexbe_widget`
+
+Version of package(s) in repository `flexbe_behavior_engine`:
+
+- upstream repository: https://github.com/FlexBE/flexbe_behavior_engine.git
+- release repository: https://github.com/ros2-gbp/flexbe_behavior_engine-release.git
+- rosdistro version: `3.0.3-2`
+- old version: `3.0.3-0`
+- new version: `4.0.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.13.0`
+- catkin_pkg version: `1.1.0`
+- rosdep version: `0.26.0`
+- rosdistro version: `1.0.1`
+- vcstools version: `0.1.42`
+
+
 ## flexbe_behavior_engine (jazzy) - 3.0.7-1
 
 The packages in the `flexbe_behavior_engine` repository were released into the `jazzy` distro by running `/usr/bin/bloom-release --new-track --track jazzy --rosdistro jazzy flexbe_behavior_engine` on `Sat, 08 Nov 2025 23:05:34 -0000`
