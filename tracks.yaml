@@ -94,13 +94,13 @@ tracks:
     last_version: 3.0.3
     name: upstream
     patches: null
-    release_inc: '1'
+    release_inc: '0'
     release_repo_url: null
     release_tag: :{version}
     ros_distro: jazzy
     vcs_type: git
     vcs_uri: https://github.com/FlexBE/flexbe_behavior_engine.git
-    version: 3.0.3
+    version: 3.0.7
   kilted:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
@@ -116,17 +116,17 @@ tracks:
       :{release_inc} --os-name fedora
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
-    devel_branch: rolling
+    devel_branch: ros2-devel
     last_version: 3.0.3
     name: upstream
     patches: null
-    release_inc: '2'
+    release_inc: '0'
     release_repo_url: null
     release_tag: :{version}
     ros_distro: kilted
     vcs_type: git
     vcs_uri: https://github.com/FlexBE/flexbe_behavior_engine.git
-    version: 3.0.3
+    version: 4.0.2
   kinetic:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
@@ -244,14 +244,14 @@ tracks:
       :{release_inc} --os-name fedora
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
-    devel_branch: rolling
+    devel_branch: ros2-devel
     last_version: 3.0.3
     name: upstream
     patches: null
-    release_inc: '1'
+    release_inc: '0'
     release_repo_url: null
     release_tag: :{version}
     ros_distro: rolling
     vcs_type: git
     vcs_uri: https://github.com/FlexBE/flexbe_behavior_engine.git
-    version: 3.0.3
+    version: 4.0.2
