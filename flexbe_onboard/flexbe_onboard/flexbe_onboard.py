@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -55,7 +55,7 @@ from flexbe_core.core.state_machine import StateMachine
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 
-from flexbe_msgs.msg import BEStatus, BehaviorSelection, BehaviorSync, CommandFeedback, UserdataInfo
+from flexbe_msgs.msg import BEStatus, BehaviorSelection, BehaviorSync, CommandFeedback, StateMapMsg, UserdataInfo
 from flexbe_msgs.srv import GetUserdata
 
 import rclpy
@@ -94,7 +94,10 @@ class FlexbeOnboard(Node):
         self._heartbeat_pub = self.create_publisher(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC, 10)
         self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 10)
 
+        # Latch state map so we can retrieve later if desired
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_TOPIC, qos_profile=latching_qos)
+
         self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC,
                                                      self._version_callback, qos_profile=latching_qos)
 
@@ -158,7 +161,7 @@ class FlexbeOnboard(Node):
             Logger.logwarn(f'Received behavior start request for {beh_sel_msg.behavior_key} '
                            f'({beh_sel_msg.behavior_id}) while prior request was starting.\n    Ignore second request!')
             return
-        self._starting = True  # Prevent two start requests from ocurring back to back
+        self._starting = True  # Prevent two start requests from occurring back to back
         self._trigger_ready = False  # We have received the behavior selection request
         self._ready_counter = 0
         thread = threading.Thread(target=self._behavior_execution, args=[beh_sel_msg])
@@ -315,7 +318,15 @@ class FlexbeOnboard(Node):
                 self.be.confirm()
                 Logger.localinfo(f'    behavior {self.be.name}: {self.be.beh_id} confirmation.')
 
-                args = [self.be.requested_state_path] if self.be.requested_state_path is not None else []
+                # Publish behavior state map as a debugging aid (match to OCS side published by launcher and mirror)
+                state_ids, state_paths = be.state_map_items
+                state_map_msg = StateMapMsg(behavior_id=be.beh_id,
+                                            state_ids=state_ids,
+                                            state_paths=state_paths)
+                self._state_map_pub.publish(state_map_msg)
+
+                # Publish start status
+                args = [self.be.requested_state_id] if self.be.requested_state_id is not None else []
                 Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} BEStatus STARTED.')
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
                                                   behavior_id=self.be.beh_id,
@@ -385,8 +396,8 @@ class FlexbeOnboard(Node):
                                        f"occurrences of key='{request.userdata_key}' "
                                        f"from be='{self.be._state_machine._name}'")
                 for ud in userdata:
-                    self.get_logger().info(f"\tuser data key={ud.key}:\n{ud.data}\n{10*'-'}")
-                self.get_logger().info(f"{10*'='} End get user data {10*'='}")
+                    self.get_logger().info(f"\tuser data key={ud.key}:\n{ud.data}\n{10 * '-'}")
+                self.get_logger().info(f"{10 * '='} End get user data {10 * '='}")
                 response.success = True
             else:
                 response.success = False
@@ -411,7 +422,7 @@ class FlexbeOnboard(Node):
                 raise ValueError(beh_sel_msg.behavior_key)
             be_filepath = self._behavior_lib.get_sourcecode_filepath(beh_sel_msg.behavior_key, add_tmp=True)
             if os.path.isfile(be_filepath):
-                self.get_logger().warn('Found a tmp version of the referred behavior! Assuming local test run.')
+                self.get_logger().warning('Found a tmp version of the referred behavior! Assuming local test run.')
             else:
                 be_filepath = self._behavior_lib.get_sourcecode_filepath(beh_sel_msg.behavior_key)
 
@@ -498,8 +509,8 @@ class FlexbeOnboard(Node):
                     suffix = ' (' + behavior + ')' if behavior != '' else ''
                     self.get_logger().info(key + ' = ' + beh_sel_msg.arg_values[i] + suffix)
                 else:
-                    self.get_logger().warn(f"Parameter '{beh_sel_msg.arg_keys[i]}' "
-                                           f"(set to '{beh_sel_msg.arg_values[i]}') not defined")
+                    self.get_logger().warning(f"Parameter '{beh_sel_msg.arg_keys[i]}' "
+                                              f"(set to '{beh_sel_msg.arg_values[i]}') not defined")
         except Exception as exc:
             Logger.logerr(f'Failed to initialize parameters for '
                           f"behavior key='{beh_sel_msg.behavior_key}':\n  {type(exc)} - {exc}")

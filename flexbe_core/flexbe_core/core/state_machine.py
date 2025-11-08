@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -139,6 +139,7 @@ class StateMachine(State):
         if outcome:
             # Exit this statemachine
             self.on_exit(self._userdata)
+            self._publish_outcome(outcome)
 
         return outcome
 
@@ -146,12 +147,13 @@ class StateMachine(State):
         """Call on entering the state machine."""
         self.assert_consistent_transitions()
         self._entering = False
+        self._exited = False
         self._current_state = self.initial_state
         self._current_state._entering = True  # Force entering action
         self._userdata = userdata if userdata is not None else UserData()
         self._userdata(add_from=self._own_userdata)
-        Logger.localinfo(f"Entering StateMachine '{self.name}' of '{self.path}' "
-                         f"({self._state_id}) initial state='{self._current_state.name}'")
+        # Logger.localinfo(f"Entering StateMachine '{self.name}' of '{self.path}' "
+        #                  f"({self.state_id}) initial state='{self._current_state.name}' ({self.__class__.__name__})")
 
     def _execute_current_state(self):
         """Execute the currently active state in this SM."""
@@ -232,10 +234,10 @@ class StateMachine(State):
         @return: The list of active states (not state machine)
         """
         if isinstance(self._current_state, StateMachine):
-            return self._current_state.get_deep_states()
+            return [self] + self._current_state.get_deep_states()
 
         # Base case is current_state is not a state machine
-        return [self._current_state] if self._current_state is not None else []  # Return as a list
+        return [self, self._current_state] if self._current_state is not None else [self]  # Return as a list
 
     # consistency checks
 

@@ -2,6 +2,28 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.2 (2025-11-08)
+------------------
+* clean of latest flake8 tests
+* update test set up for colcon testing and build farm
+* specify python3
+* reduce spam for potential (likely short lived) sync issues
+
+4.0.1 (2024-09-26)
+------------------
+* codespell clean up
+* report all states in deep_states including containers and finished states
+* re-request outcome on sync request
+* notify skipped for containers
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+* use state id consistently to avoid long path strings
+* modify preempt and published outcome to improve sync
+* add flexbe_outcome_listener node for simple monitoring
+
 3.0.7 (2024-08-24)
 ------------------
 * modify mirror handling for controllable OSM/CC and improve sync

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Christopher Newport University
 #
@@ -129,7 +129,7 @@ class SelectionState(EventState):
             Logger.localwarn(msg)
             return
 
-        # Retrive the goal for the BehaviorInput Action.
+        # Retrieve the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal(request_type=BehaviorInput.Goal.REQUEST_SELECTION,
                                          items=userdata.items, msg=self._message)
         Logger.loghint(f"Onboard requests '{self._message}' : {userdata.items}")

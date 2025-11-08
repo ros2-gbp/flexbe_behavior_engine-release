@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -34,6 +34,7 @@ import threading
 
 from flexbe_core.core.lockable_state_machine import LockableStateMachine
 from flexbe_core.core.preemptable_state import PreemptableState
+from flexbe_core.core.state import State
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 
@@ -50,8 +51,6 @@ class PreemptableStateMachine(LockableStateMachine):
 
     If preempted, the state machine will return the outcome preempted.
     """
-
-    _preempted_name = 'preempted'
 
     def __init__(self, *args, **kwargs):
         """Initialize instance."""
@@ -75,12 +74,12 @@ class PreemptableStateMachine(LockableStateMachine):
     @staticmethod
     def add(label, state, transitions=None, remapping=None):
         """Add state to SM."""
-        transitions[PreemptableState._preempted_name] = PreemptableStateMachine._preempted_name
+        transitions[State._preempted_name] = State._preempted_name
         LockableStateMachine.add(label, state, transitions, remapping)
 
     @property
     def _valid_targets(self):
-        return super()._valid_targets + [PreemptableStateMachine._preempted_name]
+        return super()._valid_targets + [State._preempted_name]
 
     def spin(self, userdata=None, rclpy_context=None):
         """Spin the execute loop for preemptable portion."""
@@ -105,7 +104,7 @@ class PreemptableStateMachine(LockableStateMachine):
                                    f"cmd='{command_msg.target}' ({command_msg.outcome}) - toss it!")
                     self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
                                       CommandFeedback(command='transition',
-                                                      args=['invalid', command_msg.target]))
+                                                      args=['invalid', f'{command_msg.target}']))
                     self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
 
             # Store the information for safely passing to heartbeat thread
@@ -144,3 +143,14 @@ class PreemptableStateMachine(LockableStateMachine):
     def process_sync_request(cls):
         """Process sync request (ignored here - should be handled by derived state)."""
         Logger.localinfo('Ignoring PreemptableState process_sync_request')
+
+    def _notify_skipped(self):
+        # make sure we dont miss a preempt even if not being executed (e.g., due to priority container)
+        if self._current_state is not None:
+            # Prioritize handling at low level state first
+            self._current_state._notify_skipped()
+
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
+            self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
+            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='preempt'))
+            PreemptableState.preempt = True

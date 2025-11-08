@@ -2,6 +2,22 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.2 (2025-11-08)
+------------------
+* clean of latest flake8 tests
+* update test set up for colcon testing and build farm
+* specify python3
+
+4.0.1 (2024-09-26)
+------------------
+* codespell clean up
+* fix typo in input_action_server
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+
 3.0.7 (2024-08-24)
 ------------------
 * fix issue with input action server
