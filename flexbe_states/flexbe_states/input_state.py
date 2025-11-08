@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -32,6 +32,8 @@
 import ast
 import pickle
 
+from action_msgs.msg import GoalStatus
+
 from flexbe_core import EventState, Logger
 from flexbe_core.proxy import ProxyActionClient
 
@@ -45,7 +47,7 @@ class InputState(EventState):
     Requests of different types, such as requesting a waypoint, a template, or a pose, can be specified.
 
     -- request  uint8       One of the custom-defined values to specify the type of request.
-    -- message  string      Message displayed to the operator to let him know what to do.
+    -- message  string      Message displayed to the operators to let them know what to do.
     -- timeout  float       Timeout in seconds to wait for server to be available.
 
     #> data     object      The data provided by the operator. The exact type depends on the request.
@@ -73,62 +75,70 @@ class InputState(EventState):
         self._request = request
         self._message = message
         self._timeout = timeout
-        self._connected = False
-        self._received = False
+        self._return = None
 
     def on_start(self):
         """Set up proxy action client for behavior input server on behavior start."""
         self._client = ProxyActionClient({self._action_topic: BehaviorInput}, wait_duration=0.0)
-        self._connected = True
 
     def on_stop(self):
         """Stop client when behavior stops."""
         ProxyActionClient.remove_client(self._action_topic)
         self._client = None
-        self._connected = False
 
     def execute(self, userdata):
         """Execute state waiting for action result."""
-        if not self._connected:
-            return 'no_connection'
-        if self._received:
-            return 'received'
+        if self._return:
+            # Return prior value if blocked
+            return self._return
 
         if self._client.has_result(self._action_topic):
             result = self._client.get_result(self._action_topic)
             if result.result_code != BehaviorInput.Result.RESULT_OK:
                 userdata.data = None
-                return 'aborted'
+                self._return = 'aborted'
             else:
                 # Attempt to load data and convert it to the proper format.
                 try:
                     # Convert string to byte array and load using pickle
-                    input_data = ast.literal_eval(result.data)
+                    if self._request in (BehaviorInput.Goal.REQUEST_STRING, BehaviorInput.Goal.REQUEST_SELECTION):
+                        Logger.localinfo(f" InputState returned string '{result.data}'")
+                        response_data = result.data
+                    else:
+                        Logger.localinfo(f" InputState returned '{result.data}'")
+                        input_data = ast.literal_eval(result.data)
 
-                    # Note: This state uses the Pickle module, and is subject to this warning from the Pickle manual:
-                    #     Warning: The pickle module is not secure against erroneous or maliciously constructed data.
-                    #     Never unpickle data received from an untrusted or unauthenticated source.
-                    response_data = pickle.loads(input_data)
+                        # Note: This state uses the Pickle module, and is subject to this warning from the Pickle manual:
+                        #     Warning: The pickle module is not secure against erroneous or maliciously constructed data.
+                        #     Never unpickle data received from an untrusted or unauthenticated source.
+                        response_data = pickle.loads(input_data)
+                        Logger.localinfo(f'   converted to {type(response_data)} : {response_data}')
 
-                    Logger.localinfo(f' InputState returned {type(response_data)} : {response_data}')
                     userdata.data = response_data
+                    self._return = 'received'
                 except Exception as exc:  # pylint: disable=W0703
-                    Logger.logwarn(f"Was unable to load provided data:\n    '{result.data}'\n    {str(exc)}")
+                    Logger.logwarn('Was unable to load provided data for '
+                                   f"'{self._action_topic}':\n    '{result.data}'\n  "
+                                   f' {str(exc)}')
                     userdata.data = None
-                    return 'data_error'
+                    self._return = 'data_error'
+        elif self._client.get_status(self._action_topic) == GoalStatus.STATUS_CANCELED:
+            Logger.localinfo(f" InputState {self._action_topic}' goal was canceled! ")
+            self._return = 'aborted'
+        elif self._client.get_status(self._action_topic) == GoalStatus.STATUS_ABORTED:
+            Logger.localinfo(f" InputState {self._action_topic}' goal was aborted! ")
+            self._return = 'aborted'
 
-                self._received = True
-                return 'received'
-
-        return None
+        return self._return
 
     def on_enter(self, userdata):
         """Send goal to action server on entering state."""
-        self._received = False
+        self._client.remove_result(self._action_topic)
+        self._return = None
 
-        # Retrive the goal for the BehaviorInput Action.
+        # Retrieve the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal()
-        # Retrive the request type and message from goal.
+        # Retrieve the request type and message from goal.
         action_goal.request_type = self._request
         action_goal.msg = self._message
         Logger.loghint(f"Onboard requests '{self._message}'")
@@ -136,6 +146,23 @@ class InputState(EventState):
         # Attempt to send the goal.
         try:
             self._client.send_goal(self._action_topic, action_goal, wait_duration=self._timeout)
+            # Logger.localinfo(f"Sent goal for '{self._action_topic}'.")
         except Exception as exc:
-            Logger.logwarn('Was unable to send data request:\n%s' % str(exc))
-            self._connected = False
+            Logger.logwarn(f"Was unable to send data request for '{self._action_topic}':\n    {exc}")
+            self._return = 'no_connection'
+
+    def on_exit(self, userdata):
+        """Call when state exits."""
+        # Make sure that the action is not running when leaving this state.
+        # A situation where the action would still be active is for example when the operator manually triggers an outcome.
+        Logger.localinfo(f"on exit for '{self._action_topic}'.")
+
+        if self._client.is_active(self._action_topic):
+            self._client.cancel(self._action_topic)
+            Logger.loginfo(f"Cancelled active action goal for '{self._action_topic}'.")
+
+        if self._client.has_result(self._action_topic):
+            # remove the old result so we are ready for the next time
+            # and don't prematurely return
+            # Note: We don't delete in execute to allow the cancel check above
+            self._client.remove_result(self._action_topic)
