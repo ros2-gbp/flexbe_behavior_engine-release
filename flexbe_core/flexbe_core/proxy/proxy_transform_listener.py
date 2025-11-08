@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -51,7 +51,7 @@ class ProxyTransformListener:
 
     @staticmethod
     def shutdown():
-        """Shut down this proxy by reseting the transform listener."""
+        """Shut down this proxy by resetting the transform listener."""
         try:
             ProxyTransformListener._listener = None
             ProxyTransformListener._buffer = None
