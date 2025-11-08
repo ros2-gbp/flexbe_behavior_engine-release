@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
@@ -39,7 +39,7 @@
 
 __test__ = False  # Do not pytest this class (it is the test!)
 
-from flexbe_INVALID import Autonomy, Behavior, OperatableStateMachine
+from flexbe_INVALID import Autonomy, Behavior, OperatableStateMachine, initialize_flexbe_core
 
 from flexbe_states.calculation_state import CalculationState
 from flexbe_states.decision_state import DecisionState
@@ -75,12 +75,7 @@ class ComplexBehaviorTestSM(Behavior):
         self.name = 'Complex Behavior Test'
         self.node = node
 
-        WaitState.initialize_ros(node)
-        DecisionState.initialize_ros(node)
-        CalculationState.initialize_ros(node)
-        flexbe_states__LogState.initialize_ros(node)
-
-        OperatableStateMachine.initialize_ros(node)
+        initialize_flexbe_core(node)
 
         # parameters of this behavior
         self.add_parameter('param', 'value_1')
