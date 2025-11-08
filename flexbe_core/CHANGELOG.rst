@@ -1,6 +1,43 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+3.0.7 (2024-08-24)
+------------------
+* reduce default wait durations on proxy start ups; reduce start up spam
+* clarify state map message
+* allow controllable OSM and concurrency outputs; improve sync handling; unhandled state exception stops behavior
+* modify clear action handling; retain action result status; reduce startup spam
+* add initialize_flexbe_core for common initialization
+* updates to ConcurrencyContainer and StateMachine to handle sync and forced outcomes
+
+3.0.6 (2024-08-05)
+------------------
+* update cancel for action client
+* define get_status to replace get_state for proxy action client
+* remove result from input_state or cancel on exit
+* call on_exit from state_machine and use that to handle concurrency container exit
+* update get_required_autonomy check for concurrency container
+* minor clean up from flake8/pycodestyle
+* add option to globally set desired update rate by calling set_default_rate from behavior
+* add peek_at_buffer to proxy subscriber
+* modify processing of transition command for nested behaviors
+* modify _entering flag and no sleep if entering
+* grab reference to avoid race condition processing message in different thread while behavior finishing
+* tweak state_map __str__ text.
+
+3.0.5 (2024-07-02)
+------------------
+
+3.0.4 (2024-07-02)
+------------------
+* minor clean up from flake8/pycodestyle
+* add option to globally set desired update rate by calling set_default_rate from behavior
+* add peek_at_buffer to proxy subscriber; modify processing of transition command for nested behaviors
+* modify _entering flag and no sleep if entering
+* grab reference to avoid race condition processing message in different thread while behavior finishing
+* tweak state_map string text
+
 3.0.3 (2024-06-06)
 ------------------
 
