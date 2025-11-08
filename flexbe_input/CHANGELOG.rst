@@ -1,9 +1,26 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+3.0.7 (2024-08-24)
+------------------
+* fix issue with input action server
+* add new states; modify BehaviorInput to allow strings and selection combo box
+* add initialize_flexbe_core for common initialization
+
+3.0.6 (2024-08-05)
+------------------
+* allow canceling input request
+* set style for the Input GUI
+
+3.0.5 (2024-07-02)
+------------------
+
+3.0.4 (2024-07-02)
+------------------
+
 3.0.3 (2024-06-06)
 ------------------
-* Update preparing for Jazzy release
 
 3.0.2 (2024-06-04)
 ------------------
