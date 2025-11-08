@@ -1,6 +1,42 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+4.0.2 (2025-11-08)
+------------------
+* flake8 cleanup and CI badge update
+* fixed state_logger and be_action_server for ros2
+* clean of latest flake8 tests
+* update test set up for colcon testing and build farm
+* specify python3
+
+4.0.1 (2024-09-26)
+------------------
+* codespell clean up
+* rename to flexbe_status_listener with heartbeat and sync updates
+* use latched state_map topic
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+* use state id consistently to avoid long path strings
+* modify preempt and published outcome to improve sync
+* add flexbe_outcome_listener node for simple monitoring
+
+3.0.7 (2024-08-24)
+------------------
+* update create_repo script
+
+3.0.6 (2024-08-05)
+------------------
+
+3.0.5 (2024-07-02)
+------------------
+
+3.0.4 (2024-07-02)
+------------------
+
 3.0.3 (2024-06-06)
 ------------------
 
