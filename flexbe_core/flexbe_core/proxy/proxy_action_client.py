@@ -45,13 +45,22 @@ class ProxyActionClient:
     _clients = {}
     _has_active_goal = {}
     _current_goal = {}
-    _cancel_current_goal = {}
 
     _result = {}
     _result_status = {}
     _feedback = {}
 
     _client_sync_lock = Lock()
+
+    _goal_status_dict = {
+        0: 'UNKNOWN',
+        1: 'ACCEPTED',
+        2: 'EXECUTING',
+        3: 'CANCELING',
+        4: 'SUCCEEDED',
+        5: 'CANCELED',
+        6: 'ABORTED'
+    }
 
     @staticmethod
     def initialize(node):
@@ -74,15 +83,14 @@ class ProxyActionClient:
             ProxyActionClient._result.clear()
             ProxyActionClient._result_status.clear()
             ProxyActionClient._feedback.clear()
-            ProxyActionClient._cancel_current_goal.clear()
             ProxyActionClient._has_active_goal.clear()
             ProxyActionClient._current_goal.clear()
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy action clients!\n{ str(exc)}')
 
-    def __init__(self, topics=None, wait_duration=10):
+    def __init__(self, topics=None, wait_duration=1.0):
         """
-        Initialize the proxy with optionally a given set of clients.
+        Initialize the proxy with an optionally given set of clients.
 
         @type topics: dictionary string - message class
         @param topics: A dictionay containing a collection of topic - message type pairs.
@@ -96,10 +104,10 @@ class ProxyActionClient:
                 ProxyActionClient.setup_client(topic, action_type, wait_duration)
 
     @classmethod
-    def setupClient(cls, topic, action_type, wait_duration=10):
+    def setupClient(cls, topic, action_type, wait_duration=1.0):
         """Set up proxy action client (Deprecated)."""
         Logger.localerr('Deprecated: Use ProxyActionClient.setup_client instead!')
-        cls.setup_client(topic, action_type, wait_duration=10)
+        cls.setup_client(topic, action_type, wait_duration)
 
     @classmethod
     def setup_client(cls, topic, action_type, wait_duration=None):
@@ -173,7 +181,6 @@ class ProxyActionClient:
         ProxyActionClient._result[topic] = None
         ProxyActionClient._result_status[topic] = None
         ProxyActionClient._feedback[topic] = None
-        ProxyActionClient._cancel_current_goal[topic] = False
         ProxyActionClient._has_active_goal[topic] = True
         ProxyActionClient._current_goal[topic] = None
 
@@ -200,14 +207,19 @@ class ProxyActionClient:
         future = client.send_goal_async(new_goal,
                                         feedback_callback=lambda f: ProxyActionClient._feedback_callback(topic, f)
                                         )
-        ProxyActionClient._result_status[topic] = GoalStatus.STATUS_ACCEPTED
         future.add_done_callback(partial(ProxyActionClient._done_callback, topic=topic))
 
     @classmethod
     def _done_callback(cls, future, topic):
         ProxyActionClient._current_goal[topic] = future
-        result = future.result().get_result_async()
-        result.add_done_callback(partial(ProxyActionClient._result_callback, topic=topic))
+        if future.result().accepted:
+            result = future.result().get_result_async()
+            ProxyActionClient._result_status[topic] = GoalStatus.STATUS_ACCEPTED
+            result.add_done_callback(partial(ProxyActionClient._result_callback, topic=topic))
+        else:
+            ProxyActionClient._result_status[topic] = GoalStatus.STATUS_ABORTED
+            ProxyActionClient._has_active_goal[topic] = False
+            Logger.localinfo(f"Goal for '{topic}' ({future.result().goal_id.uuid}) was rejected!")
 
     @classmethod
     def _result_callback(cls, future, topic):
@@ -219,7 +231,7 @@ class ProxyActionClient:
 
     @classmethod
     def _feedback_callback(cls, topic, feedback):
-        ProxyActionClient._feedback[topic] = feedback
+        ProxyActionClient._feedback[topic] = feedback.feedback
 
     @classmethod
     def is_available(cls, topic):
@@ -252,14 +264,21 @@ class ProxyActionClient:
         return ProxyActionClient._result.get(topic) is not None
 
     @classmethod
-    def get_result(cls, topic):
+    def get_result(cls, topic, clear=False):
         """
         Return the result message of the given action call.
 
-        @type topic: string
-        @param topic: The topic of interest.
+        :param topic: The topic of interest.
+        :type topic: str
+        :param clear: Clear the prior response
+        :type clear: bool
         """
-        return ProxyActionClient._result.get(topic)
+        result = ProxyActionClient._result.get(topic)
+
+        if clear and result is not None:
+            ProxyActionClient._result[topic] = None
+
+        return result
 
     @classmethod
     def remove_result(cls, topic):
@@ -270,7 +289,6 @@ class ProxyActionClient:
         @param topic: The topic of interest.
         """
         ProxyActionClient._result[topic] = None
-        ProxyActionClient._result_status[topic] = None
 
     @classmethod
     def has_feedback(cls, topic):
@@ -283,14 +301,20 @@ class ProxyActionClient:
         return ProxyActionClient._feedback.get(topic) is not None
 
     @classmethod
-    def get_feedback(cls, topic):
+    def get_feedback(cls, topic, clear=False):
         """
         Return the latest feedback message of the given action call.
 
-        @type topic: string
-        @param topic: The topic of interest.
+        :param topic: The topic of interest.
+        :type topic: str
+        :param clear: Clear the prior response
+        :type clear: bool
         """
-        return ProxyActionClient._feedback.get(topic)
+        feedback = ProxyActionClient._feedback.get(topic)
+        if clear:
+            ProxyActionClient._feedback[topic] = None
+
+        return feedback
 
     @classmethod
     def remove_feedback(cls, topic):
@@ -305,7 +329,22 @@ class ProxyActionClient:
     @classmethod
     def get_state(cls, topic):
         """
-        Determine the actionlib state of the given action topic.
+        Determine the action status of the given action topic.
+
+        A list of possible states is defined in action_msgs/GoalStatus.
+
+        @type topic: string
+        @param topic: The topic of interest.
+
+        @deprecated: This method is deprecated and will be removed in a future release.
+                Use the `get_status` method instead.
+        """
+        return ProxyActionClient._result_status.get(topic)
+
+    @classmethod
+    def get_status(cls, topic):
+        """
+        Determine the action server status of the given action topic.
 
         A list of possible states is defined in action_msgs/GoalStatus.
 
@@ -313,6 +352,22 @@ class ProxyActionClient:
         @param topic: The topic of interest.
         """
         return ProxyActionClient._result_status.get(topic)
+
+    @classmethod
+    def get_status_string(cls, topic):
+        """
+        Return the action server status of the given action topic as a string.
+
+        A list of possible states is defined in action_msgs/GoalStatus.
+
+        @type topic: string
+        @param topic: The topic of interest.
+        """
+        status_code = ProxyActionClient._result_status.get(topic)
+        if status_code in cls._goal_status_dict:
+            return cls._goal_status_dict[status_code]
+
+        return 'Unknown Status'
 
     @classmethod
     def is_active(cls, topic):
@@ -329,15 +384,35 @@ class ProxyActionClient:
         """
         Cancel the current action call on the given action topic.
 
-        @type topic: string
-        @param topic: The topic of interest.
+        :param topic: The topic of interest.
+        :type topic: str
+        :param block: Whether to wait for the cancel response.
+        :type block: bool
         """
-        current_goal = ProxyActionClient._current_goal.get(topic)
-        if current_goal is not None:
-            current_goal.result().cancel_goal()
+        Logger.localinfo(f"Request to cancel '{topic}' ...")
+        current_goal_future = ProxyActionClient._current_goal.get(topic)
+        if current_goal_future is not None:
+            try:
+                current_goal_handle = current_goal_future.result()
+                cancel_future = current_goal_handle.cancel_goal_async()
+                ProxyActionClient._result_status[topic] = GoalStatus.STATUS_CANCELING
 
-        ProxyActionClient._cancel_current_goal[topic] = True
+                # add callback to acknowledge completion of cancel_goal
+                cancel_future.add_done_callback(partial(ProxyActionClient._cancel_callback, topic=topic))
+
+            except Exception as exc:
+                Logger.localinfo(f"  Error canceling '{topic}' : {exc}")
+        else:
+            Logger.localinfo(f"Failed to send cancel request for '{topic}' ...")
+
         ProxyActionClient._current_goal[topic] = None
+
+    @classmethod
+    def _cancel_callback(cls, future, topic):
+        result = future.result()
+        Logger.localinfo(f"   cancel result for '{topic}' : result={result.return_code}")
+        ProxyActionClient._result_status[topic] = GoalStatus.STATUS_CANCELED
+        ProxyActionClient._has_active_goal[topic] = False
 
     @classmethod
     def _check_topic_available(cls, topic, wait_duration=0.1):
