@@ -1,3 +1,35 @@
+## flexbe_behavior_engine (rolling) - 4.0.3-1
+
+The packages in the `flexbe_behavior_engine` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --new-track --track rolling --rosdistro rolling flexbe_behavior_engine` on `Mon, 10 Nov 2025 17:01:17 -0000`
+
+These packages were released:
+- `flexbe_behavior_engine`
+- `flexbe_core`
+- `flexbe_input`
+- `flexbe_mirror`
+- `flexbe_msgs`
+- `flexbe_onboard`
+- `flexbe_states`
+- `flexbe_testing`
+- `flexbe_widget`
+
+Version of package(s) in repository `flexbe_behavior_engine`:
+
+- upstream repository: https://github.com/FlexBE/flexbe_behavior_engine.git
+- release repository: https://github.com/ros2-gbp/flexbe_behavior_engine-release.git
+- rosdistro version: `4.0.2-1`
+- old version: `4.0.3-0`
+- new version: `4.0.3-1`
+
+Versions of tools used:
+
+- bloom version: `0.13.0`
+- catkin_pkg version: `1.1.0`
+- rosdep version: `0.26.0`
+- rosdistro version: `1.0.1`
+- vcstools version: `0.1.42`
+
+
 ## flexbe_behavior_engine (rolling) - 4.0.2-1
 
 The packages in the `flexbe_behavior_engine` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --new-track --track rolling --rosdistro rolling flexbe_behavior_engine` on `Sat, 08 Nov 2025 23:24:37 -0000`
