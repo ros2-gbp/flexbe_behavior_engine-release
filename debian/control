@@ -1,0 +1,12 @@
+Source: ros-rolling-flexbe-widget
+Section: misc
+Priority: optional
+Maintainer: Philipp Schillinger <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), python3-pytest <!nocheck>, ros-rolling-ament-cmake, ros-rolling-ament-cmake-python, ros-rolling-ament-copyright <!nocheck>, ros-rolling-ament-flake8 <!nocheck>, ros-rolling-ament-pep257 <!nocheck>, ros-rolling-flexbe-core, ros-rolling-flexbe-mirror, ros-rolling-flexbe-msgs, ros-rolling-flexbe-onboard, ros-rolling-launch-ros, ros-rolling-rclpy, ros-rolling-ros-workspace
+Homepage: http://ros.org/wiki/flexbe_core
+Standards-Version: 3.9.2
+
+Package: ros-rolling-flexbe-widget
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-flexbe-core, ros-rolling-flexbe-mirror, ros-rolling-flexbe-msgs, ros-rolling-flexbe-onboard, ros-rolling-launch-ros, ros-rolling-rclpy, ros-rolling-ros-workspace
+Description: flexbe_widget implements some smaller scripts for the behavior engine.
