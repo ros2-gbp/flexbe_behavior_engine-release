@@ -33,6 +33,7 @@ from flexbe_core import Logger
 from flexbe_core.core import State, StateMachine
 from flexbe_core.core import StateMap
 
+from flexbe_mirror.mirror_priority_container import MirrorPriorityContainer
 from flexbe_mirror.mirror_state import MirrorState
 from flexbe_mirror.mirror_state_machine import MirrorStateMachine
 
@@ -63,8 +64,6 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
         """Exit state and prepare for next entry (outcome -1 means preempt)."""
         self._entering = True
         for state in self._states if states is None else states:
-            if state in self._returned_outcomes:
-                continue  # skip states that already exited themselves
             state._entering = True
             state.on_exit_mirror(userdata, -1)  # preempted
 
@@ -108,10 +107,23 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
 
     def _execute_current_state_mirror(self, userdata):
         self._current_state = []  # Concurrent updates active states list each cycle
+
+        # Mirror onboard ConcurrencyContainer priority logic: when any MirrorPriorityContainer child
+        # is active (not yet returned), skip all non-priority siblings exactly as the onboard does
+        # via PriorityContainer.active_container_segments.
+        has_active_priority = any(
+            isinstance(s, MirrorPriorityContainer)
+            and not (s.name in self._returned_outcomes and self._returned_outcomes[s.name] is not None)
+            for s in self._states
+        )
+
         # Handle interior containers
         for state in self._states:
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 continue  # already done with executing
+
+            if has_active_priority and not isinstance(state, MirrorPriorityContainer):
+                continue  # skip non-priority siblings while priority container is active
 
             out = state.execute_mirror(userdata)
             if out is not None:
@@ -134,11 +146,21 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
 
         EXCEPT for ConcurrencyContainers.  Those are both active state and container.
 
+        When a PriorityContainer child is active (not yet returned), non-priority siblings are
+        blocked on the onboard side and must be excluded here to keep heartbeat signatures in sync.
+
         @return: The list of active states (not state machine)
         """
         deep_states = [self]  # Concurrency acts as both state and container for this purpose
         if isinstance(self._current_state, list):
-            for state in self._current_state:
+            # If any priority child is active (not yet returned), only include priority children.
+            active_priority = [
+                s for s in self._current_state
+                if isinstance(s, MirrorPriorityContainer)
+                and not (s.name in self._returned_outcomes and self._returned_outcomes[s.name] is not None)
+            ]
+            visible_states = active_priority if active_priority else self._current_state
+            for state in visible_states:
                 if isinstance(state, StateMachine):
                     deep_states.extend(state.get_deep_states())
                 else:
