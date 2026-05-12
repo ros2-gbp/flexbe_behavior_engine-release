@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
+# Copyright 2026 Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -12,7 +12,7 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#    * Neither the name of the Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -28,49 +28,30 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+"""Unit tests for PriorityContainer lifecycle delegation."""
 
-"""FlexBE Core Exceptions."""
+import unittest
+from unittest.mock import patch
 
-
-class StateError(Exception):
-    """State Error."""
-
-
-class StateMachineError(Exception):
-    """StateMachine Error."""
+from flexbe_core.core.priority_container import PriorityContainer
 
 
-class UserDataError(Exception):
-    """UserData Error."""
+class TestPriorityContainerLifecycle(unittest.TestCase):
+    """Validate lifecycle delegation behavior for priority container."""
+
+    def test_on_exit_calls_parent_on_exit(self):
+        """PriorityContainer.on_exit should delegate to parent on_exit, not on_enter."""
+        container = object.__new__(PriorityContainer)
+        container._name = 'priority'
+
+        with patch('flexbe_core.core.priority_container.OperatableStateMachine.on_enter') as on_enter, \
+                patch('flexbe_core.core.priority_container.OperatableStateMachine.on_exit') as on_exit, \
+                patch('flexbe_core.core.priority_container.Logger.localinfo'):
+            PriorityContainer.on_exit(container, None)
+
+        on_exit.assert_called_once_with(None)
+        on_enter.assert_not_called()
 
 
-class FlexBEError(Exception):
-    """Base class for FlexBE domain-specific errors."""
-
-
-class ProxyError(FlexBEError):
-    """Base class for proxy-layer errors."""
-
-
-class ProxyAvailabilityError(ValueError, ProxyError):
-    """Raised when a proxy operation cannot proceed due to unavailable resources."""
-
-
-class ProxyTypeError(TypeError, ProxyError):
-    """Raised when proxy payload or interface types are invalid."""
-
-
-class TransitionError(FlexBEError):
-    """Raised for invalid state transition or transition handling failures."""
-
-
-class SyncError(FlexBEError):
-    """Raised when distributed state synchronization fails."""
-
-
-class BehaviorLoadError(FlexBEError):
-    """Raised when loading/preparing a behavior fails."""
-
-
-class ShutdownError(FlexBEError):
-    """Raised when shutdown/cleanup operations fail."""
+if __name__ == '__main__':
+    unittest.main()
