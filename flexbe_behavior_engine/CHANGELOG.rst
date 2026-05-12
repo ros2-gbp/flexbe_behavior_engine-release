@@ -2,6 +2,17 @@
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+* Use ROS 2 standard flake8 settings; use test folder as standard name
+
+4.1.2 (2026-05-11)
+------------------
+
+4.1.1 (2026-03-25)
+------------------
+* bump version to 4.1.0
+
 4.0.3 (2025-11-10)
 ------------------
 

@@ -38,10 +38,10 @@ class UserdataState(EventState):
     """
     A state that posts data onto the userdata stream.
 
-    -- data         object  The data to be posted
+    -- data    object       The data to be posted
 
     <= done                 Indicates that data was posted
-    ># data         object  A copy of the data
+    #> data   object        A copy of the data
     """
 
     def __init__(self, data):
@@ -52,5 +52,5 @@ class UserdataState(EventState):
     def execute(self, userdata):
         """Execute UserdataState."""
         # Post data to userdata and return done.
-        userdata.data = copy.copy(self._data)
+        userdata.data = copy.deepcopy(self._data)
         return 'done'
