@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from flexbe_msgs.action import BehaviorExecution
-from flexbe_msgs.msg import BEStatus, BehaviorLog, BehaviorRequest, BehaviorSelection, BehaviorSync
+from flexbe_msgs.msg import BehaviorLog, BehaviorRequest, BehaviorSelection, BehaviorSync, BEStatus
 from flexbe_msgs.msg import CommandFeedback, ContainerStructure
 from flexbe_msgs.msg import OutcomeRequest
 from flexbe_msgs.msg import StateMapMsg
@@ -56,6 +56,7 @@ class Topics:
     _LAUNCHER_HEARTBEAT_TOPIC = 'flexbe/launcher/heartbeat'  # Clock seconds active
     _MIRROR_HEARTBEAT_TOPIC = 'flexbe/mirror/heartbeat'  # Clock seconds active
     _MIRROR_PREEMPT_TOPIC = 'flexbe/mirror/preempt'  # Preempt
+    _MIRROR_STATUS_TOPIC = 'flexbe/mirror/status'  # Mirror behavior engine status
     _MIRROR_STRUCTURE_TOPIC = 'flexbe/mirror/structure'  # Pass behavior structure back to mirror
     _MIRROR_SYNC_TOPIC = 'flexbe/mirror/sync'  # Trigger mirror to re-synchronize with onboard
     _ONBOARD_HEARTBEAT_TOPIC = 'flexbe/heartbeat'  # Onboard behavior executive is alive
@@ -87,9 +88,10 @@ class Topics:
                     _CMD_UNLOCK_TOPIC: Int32,
                     _DEBUG_TOPIC: String,
                     _EXECUTE_BEHAVIOR_ACTION: BehaviorExecution,
-                    _LAUNCHER_HEARTBEAT_TOPIC: UInt32,
-                    _MIRROR_HEARTBEAT_TOPIC: UInt32,
+                    _LAUNCHER_HEARTBEAT_TOPIC: Int32,
+                    _MIRROR_HEARTBEAT_TOPIC: Int32,
                     _MIRROR_PREEMPT_TOPIC: Empty,
+                    _MIRROR_STATUS_TOPIC: BEStatus,
                     _MIRROR_STRUCTURE_TOPIC: ContainerStructure,
                     _MIRROR_SYNC_TOPIC: BehaviorSync,
                     _ONBOARD_HEARTBEAT_TOPIC: BehaviorSync,
