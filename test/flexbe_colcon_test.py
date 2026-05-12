@@ -27,33 +27,52 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Launch flexbe_behavior_engine self tests."""
-from ament_index_python.packages import get_package_share_directory
+"""Colcon testing for flexbe_testing."""
 
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+import unittest
+from os.path import join
+
+from flexbe_testing.py_tester import PyTester
 
 
-def generate_launch_description():
-    """Generate launch description."""
-    flexbe_testing_dir = get_package_share_directory('flexbe_testing')
-    path = flexbe_testing_dir + '/test/res'
+class TestFlexBETesting(PyTester):
+    """Colcon testing for flexbe_testing."""
 
-    testcases = path + '/import_only.test \n'
-    testcases += path + '/test_add.test \n'
-    testcases += path + '/sub_unavailable.test \n'
-    testcases += path + '/behavior.test \n'
+    def __init__(self, *args, **kwargs):
+        """Construct the unit test instance."""
+        super().__init__(*args, **kwargs)
 
-    return LaunchDescription([
-        DeclareLaunchArgument('pkg', default_value='flexbe_testing'),
-        DeclareLaunchArgument('testcases', default_value=testcases),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(flexbe_testing_dir + '/launch/flexbe_testing.launch.py'),
-            launch_arguments={
-                'package': LaunchConfiguration('pkg'),
-                'testcases': LaunchConfiguration('testcases'),
-            }.items()
-        )
-    ])
+    @classmethod
+    def setUpClass(cls):
+        """Set up the test class."""
+        PyTester._package = 'flexbe_testing'
+        PyTester._tests_folder = join('test', 'res')
+
+        super().setUpClass()  # Do this last after setting package and tests folder
+
+    # The tests
+    def test_import_only(self):
+        """Invoke unittest defined .test file."""
+        return self.run_test('import_only')
+
+    def test_add(self):
+        """Invoke unittest defined .test file."""
+        return self.run_test('test_add')
+
+    # def test_add_bagfile(self):
+    #     """ invoke unittest defined .test file """
+    #     return self.run_test("test_add_bagfile")
+
+    def test_sub_unavailable(self):
+        """Invoke unittest defined .test file."""
+        #  This test requires longer than normal wait for valid return value
+        #  given 1.5 second timeout in test_sub_state.py
+        return self.run_test('sub_unavailable', timeout_sec=2.5, max_cnt=None)
+
+    def test_behavior(self):
+        """Invoke unittest defined .test file."""
+        return self.run_test('behavior')
+
+
+if __name__ == '__main__':
+    unittest.main()
