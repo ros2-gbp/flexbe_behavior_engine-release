@@ -1,0 +1,12 @@
+Source: ros-rolling-flexbe-states
+Section: misc
+Priority: optional
+Maintainer: Philipp Schillinger <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), python3-pytest <!nocheck>, ros-rolling-ament-copyright <!nocheck>, ros-rolling-ament-flake8 <!nocheck>, ros-rolling-ament-pep257 <!nocheck>, ros-rolling-flexbe-core, ros-rolling-flexbe-msgs, ros-rolling-flexbe-testing, ros-rolling-geometry-msgs <!nocheck>, ros-rolling-rclpy, ros-rolling-ros-workspace, python3-all, python3-setuptools, dh-python
+Homepage: http://ros.org/wiki/flexbe_core
+Standards-Version: 3.9.2
+
+Package: ros-rolling-flexbe-states
+Architecture: any
+Depends: ${python3:Depends}, ${misc:Depends}, ros-rolling-flexbe-core, ros-rolling-flexbe-msgs, ros-rolling-flexbe-testing, ros-rolling-rclpy, ros-rolling-ros-workspace
+Description: flexbe_states provides a collection of common generic predefined states.
