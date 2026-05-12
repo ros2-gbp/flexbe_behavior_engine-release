@@ -1,4 +1,6 @@
-# Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#!/usr/bin/env python3
+
+# Copyright 2026  Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -26,52 +28,25 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-
-"""Colcon testing for flexbe_testing."""
+"""Regression tests for backwards-compatible TestContext constructors."""
 
 import unittest
-from os.path import join
 
-from flexbe_testing.py_tester import PyTester
+from flexbe_testing.test_context import PyTestContext, TestContext
 
 
-class TestFlexBETesting(PyTester):
-    """Colcon testing for flexbe_testing."""
+class TestContextBackcompat(unittest.TestCase):
+    """Ensure legacy no-node constructor usage remains valid."""
 
-    def __init__(self, *args, **kwargs):
-        """Construct the unit test instance."""
-        super().__init__(*args, **kwargs)
+    def test_test_context_allows_no_node(self):
+        """TestContext() without node should still construct and expose ok()."""
+        context = TestContext()
+        self.assertFalse(context.ok())
 
-    @classmethod
-    def setUpClass(cls):
-        """Set up the test class."""
-        PyTester._package = 'flexbe_testing'
-        PyTester._tests_folder = join('tests', 'res')
-
-        super().setUpClass()  # Do this last after setting package and tests folder
-
-    # The tests
-    def test_import_only(self):
-        """Invoke unittest defined .test file."""
-        return self.run_test('import_only')
-
-    def test_add(self):
-        """Invoke unittest defined .test file."""
-        return self.run_test('test_add')
-
-    # def test_add_bagfile(self):
-    #     """ invoke unittest defined .test file """
-    #     return self.run_test("test_add_bagfile")
-
-    def test_sub_unavailable(self):
-        """Invoke unittest defined .test file."""
-        #  This test requires longer than normal wait for valid return value
-        #  given 1.5 second timeout in test_sub_state.py
-        return self.run_test('sub_unavailable', timeout_sec=2.5, max_cnt=None)
-
-    def test_behavior(self):
-        """Invoke unittest defined .test file."""
-        return self.run_test('behavior')
+    def test_pytest_context_allows_no_node(self):
+        """PyTestContext(timeout_sec=...) without node should still construct and run ok()."""
+        context = PyTestContext(timeout_sec=0.01)
+        self.assertTrue(context.ok())
 
 
 if __name__ == '__main__':
