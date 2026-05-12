@@ -1,6 +1,6 @@
 """Setup for flexbe_testing package."""
-import os
 from glob import glob
+import os
 
 from setuptools import setup
 
@@ -8,13 +8,13 @@ package_name = 'flexbe_testing'
 
 setup(
     name=package_name,
-    version='4.0.3',
+    version='4.1.0',
     packages=[package_name],
     data_files=[
         (os.path.join('share', package_name), glob('launch/*.launch.py')),
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         (os.path.join('share', package_name), ['package.xml']),
-        (os.path.join('share', package_name), glob('tests/*.py')),
+        (os.path.join('share', package_name), glob('test/*.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,4 +24,9 @@ setup(
     maintainer_email='robotics@cnu.edu',
     description='flexbe_testing provides a framework for unit testing states.',
     license='BSD',
+    entry_points={
+        'console_scripts': [
+            'state_docstring_tester = flexbe_testing.state_docstring_tester:main',
+        ],
+    },
 )
