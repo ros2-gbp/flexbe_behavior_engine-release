@@ -33,7 +33,7 @@
 import time
 import unittest
 
-from flexbe_core import EventState, OperatableStateMachine, initialize_flexbe_core
+from flexbe_core import EventState, initialize_flexbe_core, OperatableStateMachine
 from flexbe_core.logger import Logger
 from flexbe_core.proxy import shutdown_proxies
 
@@ -45,8 +45,8 @@ class TestLogger(unittest.TestCase):
     """Test FlexBE Logger handling."""
 
     test = 0
-    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
-    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
+    __EXECUTE_TIMEOUT_SEC = 0.05
+    __TIME_SLEEP = 0.05
 
     def __init__(self, *args, **kwargs):
         """Initialize TestLogger instance."""
@@ -81,7 +81,8 @@ class TestLogger(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestLogger.__TIME_SLEEP * 2)
+        time.sleep(TestLogger.__TIME_SLEEP)
+        Logger.shutdown()
 
     def test_throttle_logger_one(self):
         """Test throttle logger one."""
