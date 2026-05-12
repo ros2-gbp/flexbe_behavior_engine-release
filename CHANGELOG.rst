@@ -2,6 +2,24 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+* Use ROS 2 standard flake8 settings; use test folder as standard name
+* Fix selection_state.on_enter to use dict-style userdata['items'] access
+
+4.1.2 (2026-05-11)
+------------------
+* Fix state docstrings in built-in states to conform to ``StateDocstringTester`` validation format
+
+4.1.1 (2026-03-25)
+------------------
+* add test coverage across all packages
+* bump version to 4.1.0
+* flexbe_states: linting and error handling improvements
+
+4.0.3 (2025-11-10)
+------------------
+
 4.0.2 (2025-11-08)
 ------------------
 * update test set up for colcon testing and build farm
