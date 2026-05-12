@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
+# Copyright 2026  Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,48 +29,18 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""FlexBE Core Exceptions."""
+"""Utilities for mapping exceptions to BEStatus codes."""
+
+from flexbe_msgs.msg import BEStatus
+
+from .exceptions import BehaviorLoadError, ProxyError, ShutdownError, SyncError, TransitionError
+from .exceptions import StateError, StateMachineError, UserDataError
 
 
-class StateError(Exception):
-    """State Error."""
-
-
-class StateMachineError(Exception):
-    """StateMachine Error."""
-
-
-class UserDataError(Exception):
-    """UserData Error."""
-
-
-class FlexBEError(Exception):
-    """Base class for FlexBE domain-specific errors."""
-
-
-class ProxyError(FlexBEError):
-    """Base class for proxy-layer errors."""
-
-
-class ProxyAvailabilityError(ValueError, ProxyError):
-    """Raised when a proxy operation cannot proceed due to unavailable resources."""
-
-
-class ProxyTypeError(TypeError, ProxyError):
-    """Raised when proxy payload or interface types are invalid."""
-
-
-class TransitionError(FlexBEError):
-    """Raised for invalid state transition or transition handling failures."""
-
-
-class SyncError(FlexBEError):
-    """Raised when distributed state synchronization fails."""
-
-
-class BehaviorLoadError(FlexBEError):
-    """Raised when loading/preparing a behavior fails."""
-
-
-class ShutdownError(FlexBEError):
-    """Raised when shutdown/cleanup operations fail."""
+def map_exception_to_bestatus(exc, default=BEStatus.FAILED):
+    """Map known FlexBE exception categories to BEStatus code values."""
+    if isinstance(exc, (ProxyError, BehaviorLoadError, ShutdownError, SyncError, TransitionError)):
+        return BEStatus.ERROR
+    if isinstance(exc, (StateError, StateMachineError, UserDataError)):
+        return BEStatus.FAILED
+    return default
