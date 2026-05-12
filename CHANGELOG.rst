@@ -2,6 +2,24 @@
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+* Use ROS 2 standard flake8 settings; use test folder as standard name
+
+4.1.2 (2026-05-11)
+------------------
+* Add ``StateDocstringTester`` framework and ``state_docstring_tester`` CLI tool for validating FlexBE state docstring tags
+
+4.1.1 (2026-03-25)
+------------------
+* add test coverage across all packages
+* bump version to 4.1.0
+* flexbe_testing: framework improvements and profiler tools
+
+4.0.3 (2025-11-10)
+------------------
+* correct 4.0.2 version in setup.py
+
 4.0.2 (2025-11-08)
 ------------------
 * flake8 cleanup and CI badge update
