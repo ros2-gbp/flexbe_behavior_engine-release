@@ -2,6 +2,18 @@
 Changelog for package flexbe_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+
+4.1.2 (2026-05-11)
+------------------
+* Add ``CLASS_OUTCOME`` string constant to ``StateInstantiation.msg``
+
+4.1.1 (2026-03-25)
+------------------
+* bump version to 4.1.0
+* flexbe_msgs: add BEStatus fields and clean up CMakeLists
+
 4.0.3 (2025-11-10)
 ------------------
 
