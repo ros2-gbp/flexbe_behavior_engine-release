@@ -45,6 +45,7 @@ class SelectionState(EventState):
 
     -- message  string      Message displayed to the operators to let them know what to do.
     -- timeout  float       Timeout in seconds to wait for server to be available.
+    -- action_topic string  Action topic used by the behavior input server.
 
     ># items    object      List or tuple of items to select from
     #> data     object      The data selected by the operator. The exact type depends on the request.
@@ -110,10 +111,10 @@ class SelectionState(EventState):
                     userdata.data = None
                     self._return = 'data_error'
         elif self._client.get_status(self._action_topic) == GoalStatus.STATUS_CANCELED:
-            Logger.localinfo(f" InputState {self._action_topic}' goal was canceled! ")
+            Logger.localinfo(f" SelectionState {self._action_topic}' goal was canceled! ")
             self._return = 'aborted'
         elif self._client.get_status(self._action_topic) == GoalStatus.STATUS_ABORTED:
-            Logger.localinfo(f" InputState {self._action_topic}' goal was aborted! ")
+            Logger.localinfo(f" SelectionState {self._action_topic}' goal was aborted! ")
             self._return = 'aborted'
 
         return self._return
@@ -122,6 +123,10 @@ class SelectionState(EventState):
         """Send goal to action server on entering state."""
         self._client.remove_result(self._action_topic)
         self._return = None
+        try:
+            userdata.data = None
+        except AttributeError:
+            userdata['data'] = None
 
         if 'items' not in userdata:
             self._return = 'aborted'
@@ -131,8 +136,8 @@ class SelectionState(EventState):
 
         # Retrieve the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal(request_type=BehaviorInput.Goal.REQUEST_SELECTION,
-                                         items=userdata.items, msg=self._message)
-        Logger.loghint(f"Onboard requests '{self._message}' : {userdata.items}")
+                                         items=userdata['items'], msg=self._message)
+        Logger.loghint(f"Onboard requests '{self._message}' : {userdata['items']}")
 
         # Attempt to send the goal.
         try:
