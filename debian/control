@@ -1,0 +1,12 @@
+Source: ros-lyrical-flexbe-core
+Section: misc
+Priority: optional
+Maintainer: "Philipp Schillinger" <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), python3-pytest <!nocheck>, ros-lyrical-ament-copyright <!nocheck>, ros-lyrical-ament-flake8 <!nocheck>, ros-lyrical-ament-pep257 <!nocheck>, ros-lyrical-flexbe-msgs, ros-lyrical-launch-ros <!nocheck>, ros-lyrical-launch-testing <!nocheck>, ros-lyrical-rclpy, ros-lyrical-std-msgs, ros-lyrical-std-srvs, ros-lyrical-tf2-ros-py, ros-lyrical-ros-workspace, python3-all, python3-setuptools, dh-python
+Homepage: http://ros.org/wiki/flexbe_core
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-flexbe-core
+Architecture: any
+Depends: ${python3:Depends}, ${misc:Depends}, ros-lyrical-flexbe-msgs, ros-lyrical-rclpy, ros-lyrical-std-msgs, ros-lyrical-std-srvs, ros-lyrical-tf2-ros-py, ros-lyrical-ros-workspace
+Description: flexbe_core provides the core components for the FlexBE behavior engine.
