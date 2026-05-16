@@ -1,0 +1,34 @@
+path: flexbe_states.subscriber_state
+class: SubscriberState
+
+launch: flexbe_states/launch/pub.launch.py
+
+wait_cond: node.count_publishers('/test') > 0
+
+params:
+    topic: /test
+    msg_type: !!python/name:geometry_msgs.msg.Pose ''
+    blocking: True
+
+output:
+    message: !!python/object/new:geometry_msgs.msg._pose.Pose
+        state: !!python/tuple
+        - null
+        - _check_fields: false
+          _orientation: !!python/object/new:geometry_msgs.msg._quaternion.Quaternion
+                state: !!python/tuple
+                - null
+                - _check_fields: false
+                  _w: 1.0
+                  _x: 0.0
+                  _y: 0.0
+                  _z: 0.0
+          _position: !!python/object/new:geometry_msgs.msg._point.Point
+                state: !!python/tuple
+                - null
+                - _check_fields: false
+                  _x: 6.4
+                  _y: 0.0
+                  _z: 0.0
+
+outcome: received
