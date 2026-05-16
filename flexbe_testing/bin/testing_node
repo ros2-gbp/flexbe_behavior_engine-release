@@ -1,0 +1,84 @@
+#!/bin/bash
+if "true" : '''\'
+then
+python${ROS_PYTHON_VERSION:-} "${BASH_SOURCE[0]}" $*
+exit
+fi
+'''
+# flake8: noqa
+import rclpy
+import sys
+import os
+import yaml
+from rclpy.executors import MultiThreadedExecutor
+
+from flexbe_core import Logger as FlexbeLogger
+from flexbe_testing.logger import Logger
+
+from flexbe_testing import Tester
+
+if __name__ == '__main__':
+
+    context = rclpy.context.Context()
+    rclpy.init(context=context)
+    if not rclpy.ok(context=context):
+        print("rclpy is NOT ok!", flush=True)
+
+    node = rclpy.create_node('flexbe_testing', context=context)
+    executor = MultiThreadedExecutor(context=context)
+    executor.add_node(node)
+
+    FlexbeLogger.initialize(node)
+    Logger.initialize(node)
+    Logger.mute_rclpy()
+
+    filenames = list()
+    if len(sys.argv) > 1:
+        print('Loading provided test cases...')
+        for arg in sys.argv[1:]:
+            if not arg.startswith('-') and not arg.startswith('_'):
+                testfile_path = os.path.expanduser(arg)
+                filenames.append(testfile_path)
+
+    test_cases = dict()
+
+    # The last filename is automatically added by the ros2 launch
+    # So this will parse through each file and ignore the extra launch defined file
+    for i in range(len(filenames) - 1):
+      _, name = os.path.split(filenames[i])
+      test_name, _ = os.path.splitext(name)
+      try:
+          node.get_logger().info(f"  Loading {test_name} from  -->{filenames[i]}")
+          with open(filenames[i], 'r') as f:
+              config = getattr(yaml, 'unsafe_load', yaml.load)(f)
+          test_cases[test_name] = config
+      except IOError as io_error:
+          node.get_logger().error(f"  Exception in {name} : {str(io_error)}")
+          test_cases[test_name] = io_error  # not a valid config, caught during config verification
+      except Exception as exc:
+          node.get_logger().error(f"  Exception in {name} : {type(exc)} - {str(exc)}")
+          test_cases[test_name] = exc  # not a valid config, caught during config verification
+
+    print('Ready for testing! (%d tests)' % len(test_cases))
+    try:
+        tester = Tester(node, executor=executor)
+
+        success_cases = 0
+        for test_name, test_config in test_cases.items():
+            if not rclpy.ok(context=context):
+                print("rclpy is NOT ok!", flush=True)
+                break
+            print(f"Running {test_name} ...", flush=True)
+            success_cases += tester.run_test(test_name, test_config)
+        print('')
+        print(30 * '-')
+        print('')
+        result_color = '92' if success_cases == len(test_cases) else '93'
+        print('\033[%smTesting completed, %d of %d tests successful.\033[0m' %
+              (result_color, success_cases, len(test_cases)))
+        print('')
+
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown(context=context)
