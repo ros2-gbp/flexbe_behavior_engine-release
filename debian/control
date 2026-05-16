@@ -1,0 +1,12 @@
+Source: ros-lyrical-flexbe-behavior-engine
+Section: misc
+Priority: optional
+Maintainer: "Philipp Schillinger" <philsplus@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), ros-lyrical-ament-cmake, ros-lyrical-flexbe-core, ros-lyrical-flexbe-input, ros-lyrical-flexbe-mirror, ros-lyrical-flexbe-msgs, ros-lyrical-flexbe-onboard, ros-lyrical-flexbe-states, ros-lyrical-flexbe-testing, ros-lyrical-flexbe-widget, ros-lyrical-ros-workspace
+Homepage: http://ros.org/wiki/flexbe
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-flexbe-behavior-engine
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-flexbe-core, ros-lyrical-flexbe-input, ros-lyrical-flexbe-mirror, ros-lyrical-flexbe-msgs, ros-lyrical-flexbe-onboard, ros-lyrical-flexbe-states, ros-lyrical-flexbe-testing, ros-lyrical-flexbe-widget, ros-lyrical-ros-workspace
+Description: A meta-package to aggregate all the FlexBE packages
